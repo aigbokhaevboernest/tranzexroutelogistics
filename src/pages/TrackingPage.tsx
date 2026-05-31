@@ -89,10 +89,10 @@ export default function TrackingPage() {
     }
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let isInitial = true;
 
     const fetchOne = async () => {
-      setLoading(true);
-      setError(null);
+      if (isInitial) setLoading(true);
       const { data, error } = await supabase
         .from("shipments")
         .select(
@@ -102,15 +102,25 @@ export default function TrackingPage() {
         .maybeSingle();
       if (cancelled) return;
       if (error) {
-        setError(error.message);
-        setShipment(null);
+        if (isInitial) {
+          setError(error.message);
+          setShipment(null);
+        }
       } else if (!data) {
-        setError("No shipment found for this tracking number");
-        setShipment(null);
+        if (isInitial) {
+          setError("No shipment found for this tracking number");
+          setShipment(null);
+        }
       } else {
-        setShipment(data);
+        setError(null);
+        setShipment((prev: any) => {
+          // Avoid unnecessary re-renders if nothing changed
+          if (prev && prev.updated_at === data.updated_at) return prev;
+          return data;
+        });
       }
-      setLoading(false);
+      if (isInitial) setLoading(false);
+      isInitial = false;
     };
     fetchOne();
 
