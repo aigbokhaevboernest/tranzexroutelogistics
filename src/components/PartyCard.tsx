@@ -1,4 +1,4 @@
-import { Phone, Mail, MapPin, User, Globe } from "lucide-react";
+import { Phone, Mail, MapPin, Globe } from "lucide-react";
 
 function Field({ icon: Icon, label, value, href }: { icon: any; label: string; value?: string; href?: string }) {
   if (!value) return null;
@@ -40,7 +40,6 @@ export default function PartyCard({
       <div className="text-mono text-xs uppercase tracking-widest text-brand-red font-bold">{title}</div>
       <div className="mt-1 text-navy text-base font-semibold">{name || "—"}</div>
       <div className="mt-3">
-        <Field icon={User} label="Full Name" value={name} />
         <Field icon={Phone} label="Phone" value={phone} href={phone ? `tel:${phone}` : undefined} />
         <Field icon={Mail} label="Email" value={email} href={email ? `mailto:${email}` : undefined} />
         <Field icon={MapPin} label="Address" value={address} />
