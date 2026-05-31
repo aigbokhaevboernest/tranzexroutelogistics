@@ -372,15 +372,8 @@ export default function TrackingPage() {
                 </div>
               </div>
 
-              {/* 2. DESTINATION CHART */}
-              <div className="bg-white rounded-md p-6 border border-border">
-                <SectionTitle>Destination Chart</SectionTitle>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <BoldChip label="Origin" value={s.origin_label} color="#22c55e" />
-                  <BoldChip label="Current" value={s.current_stop_label || s.current_location} color="#3b82f6" />
-                  <BoldChip label="Destination" value={s.destination_label} color="#ef4444" />
-                </div>
-              </div>
+              {/* Status Chart (progress stepper) */}
+              <Stepper status={s.status} showAirport={!!s.show_airport_step} />
 
               {/* 3. SHIPPER INFORMATION */}
               <div className="bg-white rounded-md p-6 border border-border">
