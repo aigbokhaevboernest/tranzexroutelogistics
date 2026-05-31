@@ -41,14 +41,16 @@ export default function LeafletMap({
       });
       L.marker([p.lat, p.lng], { icon })
         .addTo(map)
-        .bindTooltip(p.label, { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -10] });
+        .bindTooltip(
+          `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${color}"></span>${p.label}</span>`,
+          { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -10] }
+        );
     };
 
     if (origin) addMarker(origin, colors.origin);
     if (current) addMarker(current, colors.current);
     if (destination) addMarker(destination, colors.destination);
 
-    // Route polyline & traveler
     let interval: ReturnType<typeof setInterval> | null = null;
     let travelerMarker: L.Marker | null = null;
     if (origin && destination) {
@@ -63,7 +65,6 @@ export default function LeafletMap({
         className: "route-dash",
       }).addTo(map);
 
-      // Animated traveler
       let t = 0;
       const travelerIcon = L.divIcon({
         className: "",
@@ -95,5 +96,5 @@ export default function LeafletMap({
     };
   }, [origin, current, destination]);
 
-  return <div ref={ref} className="w-full h-[420px] rounded-b-md overflow-hidden border border-border" />;
+  return <div ref={ref} className="w-full h-[420px] overflow-hidden" />;
 }

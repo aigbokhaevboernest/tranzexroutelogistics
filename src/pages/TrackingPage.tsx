@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -23,6 +23,7 @@ import MapInfoBar from "@/components/MapInfoBar";
 import LeafletMap from "@/components/LeafletMap";
 import PaymentModal from "@/components/PaymentModal";
 import PrintInvoice from "@/components/PrintInvoice";
+import ShipmentHistory from "@/components/ShipmentHistory";
 import trackingHero from "@/assets/tracking-hero.jpg";
 import packageImg from "@/assets/package.jpg";
 
@@ -33,32 +34,59 @@ const COMPANY = {
   phone: "+63 (2) 8123 4567",
 };
 
+const CUSTOMS_KEYWORDS = [
+  "customs",
+  "duty",
+  "duties",
+  "tax",
+  "tariff",
+  "clearance",
+  "import fee",
+  "vat",
+];
+
+function isCustomsComment(text?: string) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  return CUSTOMS_KEYWORDS.some((k) => t.includes(k));
+}
+
 export default function TrackingPage() {
   useDocumentMeta(
     "Track Your Shipment — Tranzex Route Logistics",
     "Real-time shipment tracking with live map and instant status updates."
   );
-  const [params] = useSearchParams();
-  const initial = params.get("n") || "";
-  const [query, setQuery] = useState(initial);
-  const [submitted, setSubmitted] = useState(initial);
+  const [params, setParams] = useSearchParams();
+  const urlN = params.get("n") || "";
+  const [query, setQuery] = useState(urlN);
+  // Source of truth for which shipment to fetch is the URL query string —
+  // this prevents flash/jump on refresh or direct URL access.
+  const submitted = urlN;
   const [shipment, setShipment] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissBanner, setDismissBanner] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
+  // Keep input in sync if URL changes (back/forward nav)
+  useEffect(() => {
+    setQuery(urlN);
+  }, [urlN]);
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const n = query.trim();
     if (!n) return;
-    setSubmitted(n);
     setDismissBanner(false);
-    window.history.replaceState(null, "", "/tracking?n=" + encodeURIComponent(n));
+    setParams({ n }, { replace: false });
   };
 
   useEffect(() => {
-    if (!submitted) return;
+    if (!submitted) {
+      setShipment(null);
+      setError(null);
+      return;
+    }
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
 
@@ -67,8 +95,10 @@ export default function TrackingPage() {
       setError(null);
       const { data, error } = await supabase
         .from("shipments")
-        .select("*")
-        .eq("tracking_number", submitted.trim())
+        .select(
+          "id, tracking_number, status, current_location, current_location_flag, amount_due, expected_delivery_date, date_sent, origin_label, destination_label, origin_lat, origin_lng, destination_lat, destination_lng, current_stop_lat, current_stop_lng, current_stop_label, package_type, weight, description, comments, package_image_url, sender_name, sender_phone, sender_email, sender_address, receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country, history, show_airport_step, hold_headline, hold_body, hold_amount, hold_note, hold_contact_email, crypto_wallet_address, bank_details, payment_instruction_note, proof_of_delivery_url, updated_at, payment_mode"
+        )
+        .eq("tracking_number", submitted)
         .maybeSingle();
       if (cancelled) return;
       if (error) {
@@ -109,6 +139,7 @@ export default function TrackingPage() {
   const onHold = s?.status === "On Hold";
   const failed = s?.status === "FAILED" || s?.status === "Returned To Warehouse";
   const delivered = s?.status === "Delivered";
+  const commentHighlight = useMemo(() => isCustomsComment(s?.comments), [s?.comments]);
 
   const origin =
     s?.origin_lat != null && s?.origin_lng != null
@@ -179,14 +210,9 @@ export default function TrackingPage() {
                   </div>
                   {s.hold_body && <p className="mt-2 text-white/90">{s.hold_body}</p>}
                   <div className="mt-3 text-mono text-xl font-extrabold">
-                    Amount Due: {s.hold_amount || `${Number(s.amount_due ?? 0).toLocaleString()} pesos`}
+                    Amount Due: {s.hold_amount || Number(s.amount_due ?? 0).toLocaleString()}
                   </div>
                   {s.hold_note && <p className="mt-2 italic text-white/85 text-sm">{s.hold_note}</p>}
-                  {s.crypto_wallet_address && (
-                    <div className="mt-2 text-mono text-xs break-all bg-black/20 inline-block px-2 py-1 rounded">
-                      {s.crypto_wallet_address}
-                    </div>
-                  )}
                   <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       onClick={() => setPayOpen(true)}
@@ -212,11 +238,12 @@ export default function TrackingPage() {
           )}
 
           {s && failed && (
-            <div className="bg-brand-red text-white rounded-md p-5 flex items-center gap-4">
-              <Undo2 className="w-7 h-7 animate-return-arrow" />
+            <div className="w-full bg-brand-red text-white rounded-md p-5 flex items-center gap-4 shadow-xl">
+              <Undo2 className="w-8 h-8 animate-return-arrow shrink-0" />
               <div>
-                <div className="font-extrabold text-display text-xl uppercase">Shipment Returned</div>
-                <div className="text-white/90 text-sm">This shipment is being returned to the warehouse.</div>
+                <div className="font-extrabold text-display text-xl uppercase">
+                  Shipment Failed — This package has been returned to the warehouse
+                </div>
               </div>
             </div>
           )}
@@ -271,20 +298,20 @@ export default function TrackingPage() {
                     />
                     <BoldChip
                       label="Amount Due"
-                      value={`${Number(s.amount_due ?? 0).toLocaleString()} pesos`}
+                      value={Number(s.amount_due ?? 0).toLocaleString()}
                       valueClass={Number(s.amount_due ?? 0) > 0 ? "text-brand-red" : ""}
                     />
                   </div>
                 )}
 
                 {s.expected_delivery_date && !delivered && (
-                  <div className="mt-5">
-                    <div className="text-xs uppercase tracking-widest text-muted-foreground font-bold mb-2">
-                      Est. Delivery
+                  <div className="mt-5 bg-navy-deep text-white rounded-md p-4">
+                    <div className="text-xs uppercase tracking-widest text-white/70 font-bold mb-3">
+                      Estimated Delivery
                     </div>
                     <Countdown target={s.expected_delivery_date} />
-                    <div className="mt-2 text-sm text-muted-foreground">
-                      Scheduled Date: {new Date(s.expected_delivery_date).toISOString()}, Before End of Day
+                    <div className="mt-3 text-sm text-white/80">
+                      Scheduled: {new Date(s.expected_delivery_date).toLocaleString()}, Before End of Day
                     </div>
                   </div>
                 )}
@@ -293,30 +320,50 @@ export default function TrackingPage() {
               {/* Stepper */}
               <Stepper status={s.status} showAirport={!!s.show_airport_step} />
 
-              {/* Shipment details */}
+              {/* 1. SHIPMENT DETAILS */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipment Details</SectionTitle>
-                <div className="grid md:grid-cols-[200px_1fr] gap-6">
+                <div className="w-full bg-secondary rounded-md overflow-hidden border border-border flex items-center justify-center">
                   <img
                     src={s.package_image_url || packageImg}
                     alt="package"
-                    className="w-full h-40 object-cover rounded-md border border-border"
+                    className="w-full max-h-[420px] object-contain"
                   />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                    <Row label="Origin" value={s.origin_label} />
-                    <Row label="Destination" value={s.destination_label} />
-                    <Row label="Type" value={s.package_type} />
-                    <Row label="Weight" value={s.weight} />
-                    <Row label="Date Sent" value={s.date_sent} />
-                    <Row label="Expected" value={s.expected_delivery_date ? new Date(s.expected_delivery_date).toLocaleDateString() : "—"} />
-                    <div className="sm:col-span-2">
-                      <Row label="Description" value={s.description} />
-                    </div>
+                </div>
+                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                  <Row label="Origin" value={s.origin_label} />
+                  <Row label="Destination" value={s.destination_label} />
+                  <Row label="Type" value={s.package_type} />
+                  <Row label="Weight" value={s.weight} />
+                  <Row label="Date Sent" value={s.date_sent} />
+                  <Row label="Expected Delivery" value={s.expected_delivery_date ? new Date(s.expected_delivery_date).toLocaleDateString() : "—"} />
+                  <div className="sm:col-span-2">
+                    <Row label="Description" value={s.description} />
                   </div>
+                  <div className="sm:col-span-2 mt-2">
+                    <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider mb-1">Status</div>
+                    <span className="inline-block bg-brand-red text-white px-3 py-1 rounded text-xs font-bold uppercase tracking-wider">
+                      {s.status}
+                    </span>
+                  </div>
+                  {s.comments && (
+                    <div className="sm:col-span-2 mt-3">
+                      <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider mb-1">Comments</div>
+                      <div
+                        className={
+                          commentHighlight
+                            ? "bg-warning/25 border-l-4 border-warning rounded p-3 text-navy text-sm font-medium"
+                            : "bg-secondary border border-border rounded p-3 text-navy text-sm"
+                        }
+                      >
+                        {s.comments}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Destination Chart */}
+              {/* 2. DESTINATION CHART */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Destination Chart</SectionTitle>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -326,7 +373,7 @@ export default function TrackingPage() {
                 </div>
               </div>
 
-              {/* Parties */}
+              {/* 3. SHIPPER INFORMATION */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipper Information</SectionTitle>
                 <PartyCard
@@ -334,9 +381,11 @@ export default function TrackingPage() {
                   name={s.sender_name}
                   phone={s.sender_phone}
                   email={s.sender_email}
+                  address={s.sender_address}
                 />
               </div>
 
+              {/* 4. CONSIGNEE INFORMATION */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Consignee Information</SectionTitle>
                 <PartyCard
@@ -349,40 +398,17 @@ export default function TrackingPage() {
                 />
               </div>
 
-              {/* History */}
+              {/* 5. SHIPMENT HISTORY */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipment History</SectionTitle>
-                {Array.isArray(s.history) && s.history.length > 0 ? (
-                  <ol className="space-y-3">
-                    {s.history.map((h: any, i: number) => (
-                      <li
-                        key={i}
-                        className={`pl-4 border-l-4 ${i === 0 ? "border-brand-red" : "border-border"} bg-secondary/40 p-3 rounded-r`}
-                      >
-                        <div className="text-mono text-xs text-muted-foreground">{h.date}</div>
-                        <div className="mt-1 inline-block bg-navy text-white text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded">
-                          {h.status}
-                        </div>
-                        <div className="mt-1 text-navy font-semibold">{h.location}</div>
-                        {h.remarks && <div className="text-sm text-muted-foreground mt-1">{h.remarks}</div>}
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <div className="text-muted-foreground text-sm">No history yet.</div>
-                )}
+                <ShipmentHistory history={s.history} />
               </div>
 
-              {/* Proof of delivery */}
-              {delivered && s.proof_of_delivery_url && (
-                <div className="bg-white rounded-md p-6 border border-border">
-                  <SectionTitle>Proof of Delivery</SectionTitle>
-                  <img src={s.proof_of_delivery_url} alt="proof" className="w-full max-w-md rounded-md border border-border" />
-                </div>
-              )}
-
-              {/* Map */}
+              {/* 6. PACKAGE DESTINATION ON MAP */}
               <div className="bg-white rounded-md border border-border overflow-hidden">
+                <div className="px-6 pt-6">
+                  <SectionTitle>Package Destination On Map</SectionTitle>
+                </div>
                 <MapInfoBar
                   origin={s.origin_label}
                   current={s.current_stop_label || s.current_location}
@@ -390,6 +416,14 @@ export default function TrackingPage() {
                 />
                 <LeafletMap origin={origin} current={current} destination={destination} />
               </div>
+
+              {/* 7. PROOF OF DELIVERY */}
+              {delivered && s.proof_of_delivery_url && (
+                <div className="bg-white rounded-md p-6 border border-border">
+                  <SectionTitle>Proof of Delivery</SectionTitle>
+                  <img src={s.proof_of_delivery_url} alt="proof" className="w-full max-w-md rounded-md border border-border" />
+                </div>
+              )}
 
               <div className="text-xs text-muted-foreground text-right">
                 Last updated: {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
@@ -400,7 +434,8 @@ export default function TrackingPage() {
                 open={payOpen}
                 onClose={() => setPayOpen(false)}
                 wallet={s.crypto_wallet_address}
-                amount={s.hold_amount || `${Number(s.amount_due ?? 0).toLocaleString()} `}
+                bankDetails={s.bank_details}
+                amount={s.hold_amount || Number(s.amount_due ?? 0).toLocaleString()}
                 note={s.payment_instruction_note}
                 contactEmail={s.hold_contact_email || COMPANY.email}
               />

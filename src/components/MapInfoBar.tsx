@@ -13,13 +13,13 @@ export default function MapInfoBar({
     { color: "#ef4444", label: "Destination", value: destination },
   ];
   return (
-    <div className="bg-[#0f172a] text-white grid grid-cols-1 md:grid-cols-3 gap-2 p-3 rounded-t-md">
+    <div className="bg-navy-deep text-white grid grid-cols-1 md:grid-cols-3 gap-2 p-3">
       {chips.map((c) => (
         <div key={c.label} className="flex items-center gap-2 px-3 py-1.5">
-          <span className="w-3 h-3 rounded-full" style={{ background: c.color, boxShadow: `0 0 0 4px ${c.color}40` }} />
-          <div>
+          <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.color, boxShadow: `0 0 0 4px ${c.color}40` }} />
+          <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-widest text-white/60">{c.label}</div>
-            <div className="text-sm font-bold">{c.value || "—"}</div>
+            <div className="text-sm font-bold truncate">{c.value || "—"}</div>
           </div>
         </div>
       ))}
