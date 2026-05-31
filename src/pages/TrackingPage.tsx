@@ -400,7 +400,7 @@ export default function TrackingPage() {
                 open={payOpen}
                 onClose={() => setPayOpen(false)}
                 wallet={s.crypto_wallet_address}
-                amount={s.hold_amount || `${Number(s.amount_due ?? 0).toLocaleString()} pesos`}
+                amount={s.hold_amount || `${Number(s.amount_due ?? 0).toLocaleString()} `}
                 note={s.payment_instruction_note}
                 contactEmail={s.hold_contact_email || COMPANY.email}
               />
