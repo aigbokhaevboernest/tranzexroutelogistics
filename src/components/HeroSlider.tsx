@@ -5,9 +5,24 @@ import hero2 from "@/assets/hero-worker.jpg";
 import hero3 from "@/assets/hero-manager.jpg";
 
 const SLIDES = [
-  { img: hero1, line1: "FAST", line2: "SERVICES" },
-  { img: hero2, line1: "DELIVERY", line2: "EXPRESS" },
-  { img: hero3, line1: "START", line2: "SHIPPING" },
+  {
+    img: hero1,
+    line1: "FAST",
+    line2: "SERVICES",
+    sub: "Experience fast, efficient, and dependable shipping services tailored to meet your needs. We prioritize speed without compromising the safety of your shipments.",
+  },
+  {
+    img: hero2,
+    line1: "DELIVERY",
+    line2: "EXPRESS",
+    sub: "Take advantage of our express delivery service for urgent shipments. With rapid transit times and real-time tracking, your packages reach their destination quickly and securely.",
+  },
+  {
+    img: hero3,
+    line1: "START",
+    line2: "SHIPPING",
+    sub: "Begin your shipping journey with ease. We provide secure, reliable, and hassle-free delivery solutions to help you send packages locally and internationally with confidence.",
+  },
 ];
 
 function useTypewriter(words: string, speed = 80, pause = 2000) {
@@ -80,13 +95,16 @@ export default function HeroSlider() {
         <span className="inline-block px-4 py-1.5 bg-brand-red/90 text-white text-xs font-bold tracking-widest rounded-full mb-6 opacity-0 animate-slide-up-fade" style={{ animationDelay: "200ms" }}>
           ● Logistics Cargo Service ●
         </span>
-        <h1 key={idx} className="text-display font-black leading-[0.9] text-white opacity-0 animate-slide-up-fade" style={{ fontSize: "clamp(3.5rem,14vw,8rem)", animationDelay: "400ms" }}>
+        <h1 key={idx} className="text-display font-black leading-[0.95] text-white opacity-0 animate-slide-up-fade" style={{ fontSize: "clamp(3rem,12vw,7rem)", animationDelay: "400ms" }}>
           {SLIDES[idx].line1}
           <br />
           <span className="text-brand-red">{SLIDES[idx].line2}</span>
         </h1>
+        <p key={`sub-${idx}`} className="mt-6 max-w-2xl text-white/85 text-base md:text-lg opacity-0 animate-slide-up-fade" style={{ animationDelay: "550ms" }}>
+          {SLIDES[idx].sub}
+        </p>
 
-        <form onSubmit={submit} className="mt-10 w-full max-w-2xl opacity-0 animate-slide-up-fade" style={{ animationDelay: "700ms" }}>
+        <form onSubmit={submit} className="mt-8 w-full max-w-2xl opacity-0 animate-slide-up-fade" style={{ animationDelay: "700ms" }}>
           <div className="flex items-stretch rounded-md overflow-hidden bg-white shadow-2xl">
             <input
               value={query}

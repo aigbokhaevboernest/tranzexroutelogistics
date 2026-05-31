@@ -16,7 +16,7 @@ export const ALL_STEPS: StepDef[] = [
 const FAILED_STATUSES = ["FAILED", "Returned To Warehouse"];
 
 function findActiveIdx(steps: StepDef[], status: string) {
-  const norm = status.toLowerCase().trim();
+  const norm = (status || "").toLowerCase().trim();
   const idx = steps.findIndex((s) => s.key.toLowerCase() === norm);
   if (idx >= 0) return idx;
   if (norm.includes("origin")) return 0;
@@ -46,10 +46,10 @@ export default function Stepper({ status, showAirport }: { status: string; showA
             <div key={s.key} className="flex-1 flex flex-col items-center text-center relative">
               <div
                 className={cn(
-                  "w-14 h-14 rounded-full flex items-center justify-center text-white shadow",
+                  "w-14 h-14 rounded-full flex items-center justify-center text-white shadow relative z-10",
                   active && "animate-glow-pulse"
                 )}
-                style={{ background: bg }}
+                style={{ background: bg, ...(active ? { boxShadow: `0 0 0 0 ${s.color}` } : {}) }}
               >
                 <s.icon className="w-6 h-6" />
               </div>
@@ -65,20 +65,45 @@ export default function Stepper({ status, showAirport }: { status: string; showA
         })}
       </div>
       {/* Mobile vertical */}
-      <div className="md:hidden flex flex-col gap-4">
+      <div className="md:hidden flex flex-col">
         {steps.map((s, i) => {
+          const past = i < activeIdx;
           const active = i === activeIdx;
           const gray = failed || i > activeIdx;
           const bg = gray ? "oklch(0.85 0 0)" : s.color;
+          const isLast = i === steps.length - 1;
           return (
-            <div key={s.key} className="flex items-center gap-3">
-              <div
-                className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white", active && "animate-glow-pulse")}
-                style={{ background: bg }}
-              >
-                <s.icon className="w-5 h-5" />
+            <div key={s.key} className="flex items-stretch gap-4">
+              {/* Circle + connector column */}
+              <div className="flex flex-col items-center">
+                <div
+                  className={cn(
+                    "w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0",
+                    active && "animate-glow-pulse"
+                  )}
+                  style={{ background: bg }}
+                >
+                  <s.icon className="w-5 h-5" />
+                </div>
+                {!isLast && (
+                  <div
+                    className="w-1 flex-1 my-1 rounded-full"
+                    style={{
+                      minHeight: 36,
+                      background: past || (active && !failed) ? s.color : "oklch(0.85 0 0)",
+                    }}
+                  />
+                )}
               </div>
-              <div className="text-sm font-bold text-navy uppercase">{s.label}</div>
+              {/* Label */}
+              <div className={cn("pt-3", !isLast && "pb-6")}>
+                <div className="text-sm font-bold text-navy uppercase">{s.label}</div>
+                {active && (
+                  <div className="text-xs font-semibold mt-0.5" style={{ color: s.color }}>
+                    Current step
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
