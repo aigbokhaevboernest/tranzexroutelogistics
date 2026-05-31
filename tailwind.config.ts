@@ -30,8 +30,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        display: ["Barlow Condensed", "sans-serif"],
-        sans: ["DM Sans", "sans-serif"],
+        display: ["Inter", "DM Sans", "sans-serif"],
+        sans: ["Inter", "DM Sans", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
       keyframes: {
