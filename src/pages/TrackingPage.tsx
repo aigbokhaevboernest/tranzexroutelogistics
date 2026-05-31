@@ -406,11 +406,8 @@ export default function TrackingPage() {
                 <ShipmentHistory history={s.history} />
               </div>
 
-              {/* 6. PACKAGE DESTINATION ON MAP */}
+              {/* MAP */}
               <div className="bg-white rounded-md border border-border overflow-hidden">
-                <div className="px-6 pt-6">
-                  <SectionTitle>Package Destination On Map</SectionTitle>
-                </div>
                 <MapInfoBar
                   origin={s.origin_label}
                   current={s.current_stop_label || s.current_location}
