@@ -315,12 +315,12 @@ export default function TrackingPage() {
                 )}
 
                 {s.expected_delivery_date && !delivered && (
-                  <div className="mt-5 bg-navy-deep text-white rounded-md p-4">
-                    <div className="text-xs uppercase tracking-widest text-white/70 font-bold mb-3">
+                  <div className="mt-5">
+                    <div className="text-xs uppercase tracking-widest text-muted-foreground font-bold mb-3">
                       Estimated Delivery
                     </div>
                     <Countdown target={s.expected_delivery_date} />
-                    <div className="mt-3 text-sm text-white/80">
+                    <div className="mt-3 text-sm text-muted-foreground">
                       Scheduled: {new Date(s.expected_delivery_date).toLocaleString()}, Before End of Day
                     </div>
                   </div>
