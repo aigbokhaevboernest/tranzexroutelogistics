@@ -179,7 +179,7 @@ export default function TrackingPage() {
                   </div>
                   {s.hold_body && <p className="mt-2 text-white/90">{s.hold_body}</p>}
                   <div className="mt-3 text-mono text-xl font-extrabold">
-                    💰 Amount Due: {s.hold_amount || `${Number(s.amount_due ?? 0).toLocaleString()} pesos`}
+                    Amount Due: {s.hold_amount || `${Number(s.amount_due ?? 0).toLocaleString()} pesos`}
                   </div>
                   {s.hold_note && <p className="mt-2 italic text-white/85 text-sm">{s.hold_note}</p>}
                   {s.crypto_wallet_address && (
