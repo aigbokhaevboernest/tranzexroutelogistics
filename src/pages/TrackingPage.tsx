@@ -327,8 +327,7 @@ export default function TrackingPage() {
                 )}
               </div>
 
-              {/* Stepper */}
-              <Stepper status={s.status} showAirport={!!s.show_airport_step} />
+              {/* (Stepper moved below Shipment Details) */}
 
               {/* 1. SHIPMENT DETAILS */}
               <div className="bg-white rounded-md p-6 border border-border">
