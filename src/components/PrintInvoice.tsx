@@ -64,7 +64,7 @@ export default function PrintInvoice({ s }: { s: any }) {
 
       <div className="mb-6">
         <div className="font-extrabold border-b pb-1 mb-2">BILLING</div>
-        <div>Amount: {Number(s?.amount_due ?? 0).toLocaleString()} pesos</div>
+        <div>Amount: {Number(s?.amount_due ?? 0).toLocaleString()}</div>
         {s?.payment_mode && <div>Payment Mode: {s.payment_mode}</div>}
       </div>
 
