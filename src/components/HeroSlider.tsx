@@ -25,7 +25,7 @@ const SLIDES = [
   },
 ];
 
-function useTypewriter(words: string, speed = 80, pause = 2000) {
+function useTypewriter(words: string, speed = 120, pause = 2000) {
   const [text, setText] = useState("");
   useEffect(() => {
     let i = 0;
