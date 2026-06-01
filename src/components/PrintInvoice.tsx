@@ -1,354 +1,426 @@
 import { useEffect, useState } from "react";
 import Barcode from "react-barcode";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 
-// ─── types ────────────────────────────────────────────────────────────────────
-interface CompanySettings {
-  company_logo_url?: string;
-  company_name?: string;
-  company_address?: string;
-  company_email?: string;
-  company_phone?: string;
+// ── adjust these to your env vars ──────────────────────────────────────────
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+// ── static fallback (used while logo loads / if fetch fails) ───────────────
+export const COMPANY = {
+  name: "Tranzex Route Logistics",
+  address: "1428 Harbor View Avenue, Manila, Philippines 1000",
+  email: "support@tranzexroute.com",
+  phone: "+63 (2) 8123 4567",
+};
+
+// ── status badge colours ───────────────────────────────────────────────────
+function statusColour(status: string) {
+  const s = (status || "").toLowerCase();
+  if (s.includes("delivered")) return { bg: "#dcfce7", text: "#15803d", border: "#86efac" };
+  if (s.includes("hold"))      return { bg: "#fef9c3", text: "#854d0e", border: "#fde047" };
+  if (s.includes("transit"))   return { bg: "#dbeafe", text: "#1d4ed8", border: "#93c5fd" };
+  if (s.includes("cancelled")) return { bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" };
+  return                               { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
 }
 
-interface PrintInvoiceProps {
-  s: any;
-  open: boolean;
-  onClose: () => void;
-}
-
-// ─── Stamp SVG ────────────────────────────────────────────────────────────────
+// ── circular SVG stamp ─────────────────────────────────────────────────────
 function Stamp({ status }: { status: string }) {
+  const label = (status || "PENDING").toUpperCase();
+  const r = 60;
+  const cx = 80, cy = 80;
+  const circumference = Math.PI * r;          // half-circle for top arc text
+
   return (
-    <svg width="110" height="110" viewBox="0 0 110 110">
-      <circle cx="55" cy="55" r="50" fill="none" stroke="#ef4444" strokeWidth="3" />
-      <circle cx="55" cy="55" r="42" fill="none" stroke="#ef4444" strokeWidth="1" />
-      <text
-        style={{ font: "bold 10px sans-serif", fill: "#ef4444", letterSpacing: "2px" }}
-      >
-        <textPath href="#stampCircle" startOffset="10%">
-          TRANZEX ROUTE LOGISTICS • TRANZEX ROUTE LOGISTICS •
+    <svg width="160" height="160" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg"
+         style={{ opacity: 0.88 }}>
+      {/* outer ring */}
+      <circle cx={cx} cy={cy} r={r + 12} fill="none" stroke="#c0392b" strokeWidth="3" />
+      <circle cx={cx} cy={cy} r={r + 8}  fill="none" stroke="#c0392b" strokeWidth="1" />
+      {/* inner fill */}
+      <circle cx={cx} cy={cy} r={r + 6}  fill="rgba(192,57,43,0.07)" />
+      {/* company name along top arc */}
+      <path id="topArc"
+        d={`M ${cx - r},${cy} A ${r},${r} 0 0,1 ${cx + r},${cy}`}
+        fill="none" />
+      <text fontSize="10" fontWeight="700" fill="#c0392b" letterSpacing="1.5"
+            fontFamily="'Georgia', serif">
+        <textPath href="#topArc" startOffset="50%" textAnchor="middle">
+          TRANZEX ROUTE LOGISTICS
         </textPath>
       </text>
-      <defs>
-        <path
-          id="stampCircle"
-          d="M 55,55 m -40,0 a 40,40 0 1,1 80,0 a 40,40 0 1,1 -80,0"
-        />
-      </defs>
-      <text
-        x="55"
-        y="52"
-        textAnchor="middle"
-        style={{ font: "bold 9px sans-serif", fill: "#ef4444" }}
-      >
-        {status?.toUpperCase()}
+      {/* status in centre */}
+      <text x={cx} y={cy + 6} textAnchor="middle" fontSize="11" fontWeight="800"
+            fill="#c0392b" fontFamily="'Georgia', serif" letterSpacing="1">
+        {label}
       </text>
-      <text
-        x="55"
-        y="64"
-        textAnchor="middle"
-        style={{ font: "7px sans-serif", fill: "#ef4444" }}
-      >
-        VERIFIED
+      {/* bottom arc decoration */}
+      <path id="botArc"
+        d={`M ${cx - r},${cy} A ${r},${r} 0 0,0 ${cx + r},${cy}`}
+        fill="none" />
+      <text fontSize="9" fontWeight="600" fill="#c0392b" letterSpacing="1"
+            fontFamily="'Georgia', serif">
+        <textPath href="#botArc" startOffset="50%" textAnchor="middle">
+          ★ OFFICIAL ★
+        </textPath>
       </text>
     </svg>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function PrintInvoice({ s, open, onClose }: PrintInvoiceProps) {
-  const [company, setCompany] = useState<CompanySettings>({});
+// ── main component ─────────────────────────────────────────────────────────
+export default function PrintInvoice({ s }: { s: any }) {
+  const [logoUrl, setLogoUrl]         = useState<string | null>(null);
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
+  const [preview, setPreview]         = useState(false);
 
-  // Fetch company settings from Supabase hold_settings table
+  // fetch company settings from hold_settings
   useEffect(() => {
-    if (!open) return;
     supabase
       .from("hold_settings")
       .select("company_logo_url, company_name, company_address, company_email")
       .eq("id", 1)
       .single()
       .then(({ data }) => {
-        if (data) setCompany(data);
+        if (data) {
+          setCompanyInfo(data);
+          setLogoUrl(data.company_logo_url || null);
+        }
       });
-  }, [open]);
+  }, []);
 
-  const today = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+  const company = {
+    name:    companyInfo?.company_name    || COMPANY.name,
+    address: companyInfo?.company_address || COMPANY.address,
+    email:   companyInfo?.company_email   || COMPANY.email,
+    phone:   COMPANY.phone,
+  };
+
+  const today = new Date().toLocaleDateString("en-PH", {
+    year: "numeric", month: "long", day: "numeric",
   });
-  const year = new Date().getFullYear();
+  const year        = new Date().getFullYear();
+  const isOnHold    = (s?.status || "").toLowerCase().includes("hold");
+  const amountDue   = s?.amount_due || s?.hold_amount || "—";
+  const sc          = statusColour(s?.status || "");
 
-  const isOnHold = s?.status === "On Hold";
-  const amountDue = s?.hold_amount || s?.amount_due || "—";
+  // ── invoice JSX (shared between preview modal and print target) ───────────
+  const InvoiceBody = (
+    <div
+      id="print-invoice"
+      style={{
+        background: "#fff",
+        color: "#111",
+        padding: "40px 48px",
+        maxWidth: "860px",
+        margin: "0 auto",
+        fontFamily: "'Georgia', 'Times New Roman', serif",
+        fontSize: "13px",
+        lineHeight: "1.6",
+        position: "relative",
+      }}
+    >
+      {/* ── HEADER ──────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                    borderBottom: "3px solid #111", paddingBottom: "20px", marginBottom: "28px" }}>
+        {/* left: logo + company info */}
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          {logoUrl ? (
+            <img src={logoUrl} alt="logo" style={{ height: "56px", objectFit: "contain" }} />
+          ) : (
+            <div style={{ width: "52px", height: "52px", background: "#111", color: "#fff",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "26px", fontWeight: 900 }}>T</div>
+          )}
+          <div>
+            <div style={{ fontSize: "18px", fontWeight: 700, textTransform: "uppercase",
+                          letterSpacing: "1px" }}>{company.name}</div>
+            <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>{company.address}</div>
+            <div style={{ fontSize: "11px", color: "#555" }}>{company.email} • {company.phone}</div>
+          </div>
+        </div>
 
-  const companyName = company.company_name || "Tranzex Route Logistics";
-  const companyAddress = company.company_address || "1428 Harbor View Avenue, Manila, Philippines 1000";
-  const companyEmail = company.company_email || "support@tranzexroute.com";
+        {/* right: Invoice label + barcode */}
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: "22px", fontWeight: 700, textTransform: "uppercase",
+                        letterSpacing: "2px" }}>Invoice / Waybill</div>
+          <div style={{ fontSize: "11px", marginTop: "2px", color: "#555" }}>Issued: {today}</div>
+          {s?.tracking_number && (
+            <div style={{ marginTop: "10px", display: "inline-block", border: "1px solid #ccc",
+                          padding: "6px" }}>
+              <Barcode value={s.tracking_number} height={50} width={1.5}
+                       fontSize={12} background="#ffffff" />
+            </div>
+          )}
+        </div>
+      </div>
 
-  if (!open) return null;
+      {/* ── TRACKING NUMBER ──────────────────────────────────────────── */}
+      <div style={{ textAlign: "center", marginBottom: "28px" }}>
+        <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "2px",
+                      color: "#555", marginBottom: "6px" }}>Tracking Number</div>
+        <div style={{ fontSize: "24px", fontWeight: 800, color: "#c0392b", letterSpacing: "2px" }}>
+          {s?.tracking_number || "—"}
+        </div>
+        <div style={{ marginTop: "8px", display: "inline-flex", gap: "10px",
+                      alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+          <span style={{ background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`,
+                         borderRadius: "4px", padding: "2px 12px", fontSize: "11px",
+                         fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px" }}>
+            {s?.status || "—"}
+          </span>
+          {s?.current_location && (
+            <span style={{ fontSize: "11px", color: "#555" }}>
+              📍 {s.current_location}
+            </span>
+          )}
+        </div>
+      </div>
 
+      {/* ── SENDER / RECEIVER ────────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px",
+                    marginBottom: "28px" }}>
+        {/* Sender */}
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "10px", textTransform: "uppercase",
+                        letterSpacing: "2px", borderBottom: "1px solid #111",
+                        paddingBottom: "4px", marginBottom: "10px" }}>FROM (SENDER)</div>
+          <div style={{ fontWeight: 700, fontSize: "15px" }}>{s?.sender_name || "—"}</div>
+          <div style={{ fontSize: "12px", color: "#444", marginTop: "4px" }}>
+            {s?.sender_phone && <div>{s.sender_phone}</div>}
+            {s?.sender_email && <div>{s.sender_email}</div>}
+            {s?.sender_address && <div>{s.sender_address}</div>}
+          </div>
+        </div>
+
+        {/* Receiver */}
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "10px", textTransform: "uppercase",
+                        letterSpacing: "2px", borderBottom: "1px solid #111",
+                        paddingBottom: "4px", marginBottom: "10px" }}>TO (RECEIVER)</div>
+          <div style={{ fontWeight: 700, fontSize: "15px" }}>{s?.receiver_name || "—"}</div>
+          <div style={{ fontSize: "12px", color: "#444", marginTop: "4px" }}>
+            {s?.receiver_phone && <div>{s.receiver_phone}</div>}
+            {s?.receiver_email && <div>{s.receiver_email}</div>}
+            {s?.receiver_address && <div>{s.receiver_address}</div>}
+            {s?.receiver_country && <div style={{ fontWeight: 600 }}>{s.receiver_country}</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── SHIPMENT DETAILS ─────────────────────────────────────────── */}
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ fontWeight: 700, fontSize: "10px", textTransform: "uppercase",
+                      letterSpacing: "2px", borderBottom: "1px solid #111",
+                      paddingBottom: "4px", marginBottom: "12px" }}>SHIPMENT DETAILS</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 32px",
+                      fontSize: "12px" }}>
+          {[
+            ["Origin",            s?.origin_label],
+            ["Destination",       s?.destination_label],
+            ["Type",              s?.package_type],
+            ["Weight",            s?.weight],
+            ["Date Sent",         s?.date_sent],
+            ["Expected Delivery", s?.expected_delivery_date
+              ? new Date(s.expected_delivery_date).toLocaleDateString() : null],
+          ].map(([label, val]) => val ? (
+            <div key={label as string}>
+              <span style={{ color: "#666" }}>{label}: </span>
+              <span style={{ fontWeight: 600 }}>{val as string}</span>
+            </div>
+          ) : null)}
+          {s?.description && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span style={{ color: "#666" }}>Description: </span>
+              <span style={{ fontWeight: 600 }}>{s.description}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── COMMENTS ─────────────────────────────────────────────────── */}
+      {s?.comments && (
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ fontWeight: 700, fontSize: "10px", textTransform: "uppercase",
+                        letterSpacing: "2px", borderBottom: "1px solid #111",
+                        paddingBottom: "4px", marginBottom: "10px" }}>COMMENTS</div>
+          <div style={{ borderLeft: "4px solid #f59e0b", paddingLeft: "12px",
+                        paddingTop: "6px", paddingBottom: "6px",
+                        background: "#fffbeb", fontSize: "12px" }}>
+            {s.comments}
+          </div>
+        </div>
+      )}
+
+      {/* ── BILLING ──────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ fontWeight: 700, fontSize: "10px", textTransform: "uppercase",
+                      letterSpacing: "2px", borderBottom: "1px solid #111",
+                      paddingBottom: "4px", marginBottom: "10px" }}>BILLING</div>
+        <div style={{ fontSize: "13px" }}>
+          <div>
+            <span style={{ color: "#666" }}>Amount Due: </span>
+            <strong style={{ fontSize: "15px" }}>{amountDue}</strong>
+          </div>
+          {s?.payment_mode && (
+            <div style={{ marginTop: "4px" }}>
+              <span style={{ color: "#666" }}>Payment Mode: </span>
+              <span style={{ fontWeight: 600 }}>{s.payment_mode}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── ON HOLD SECTION ──────────────────────────────────────────── */}
+      {isOnHold && (
+        <div style={{ marginBottom: "24px", border: "2px solid #f59e0b",
+                      borderRadius: "4px", padding: "16px", background: "#fffbeb" }}>
+          <div style={{ fontWeight: 700, fontSize: "10px", textTransform: "uppercase",
+                        letterSpacing: "2px", marginBottom: "10px", color: "#92400e" }}>
+            ⚠ SHIPMENT ON HOLD
+          </div>
+          {s?.hold_headline && (
+            <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "6px" }}>
+              {s.hold_headline}
+            </div>
+          )}
+          {s?.hold_body && (
+            <div style={{ fontSize: "12px", marginBottom: "8px" }}>{s.hold_body}</div>
+          )}
+          {s?.hold_footer_note && (
+            <div style={{ fontSize: "11px", color: "#555", marginBottom: "8px",
+                          fontStyle: "italic" }}>{s.hold_footer_note}</div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 24px",
+                        fontSize: "12px", marginTop: "8px" }}>
+            {s?.hold_amount && (
+              <div>
+                <span style={{ color: "#666" }}>Hold Amount: </span>
+                <strong>{s.hold_amount}</strong>
+              </div>
+            )}
+            {s?.hold_contact_email && (
+              <div>
+                <span style={{ color: "#666" }}>Contact: </span>
+                <span>{s.hold_contact_email}</span>
+              </div>
+            )}
+            {s?.crypto_wallet_address && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <span style={{ color: "#666" }}>Crypto Wallet: </span>
+                <span style={{ fontFamily: "monospace", fontSize: "11px" }}>
+                  {s.crypto_wallet_address}
+                </span>
+              </div>
+            )}
+            {s?.bank_name && (
+              <div>
+                <span style={{ color: "#666" }}>Bank: </span>
+                <span>{s.bank_name}</span>
+              </div>
+            )}
+            {s?.bank_account_number && (
+              <div>
+                <span style={{ color: "#666" }}>Account No.: </span>
+                <span style={{ fontFamily: "monospace" }}>{s.bank_account_number}</span>
+              </div>
+            )}
+            {s?.bank_account_name && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <span style={{ color: "#666" }}>Account Name: </span>
+                <span>{s.bank_account_name}</span>
+              </div>
+            )}
+            {s?.payment_instruction_note && (
+              <div style={{ gridColumn: "1 / -1", marginTop: "6px",
+                            borderTop: "1px dashed #f59e0b", paddingTop: "6px" }}>
+                <span style={{ color: "#666" }}>Instructions: </span>
+                <span>{s.payment_instruction_note}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── STAMP (bottom-right) ──────────────────────────────────────── */}
+      <div style={{ position: "absolute", bottom: "48px", right: "48px", opacity: 0.9 }}>
+        <Stamp status={s?.status || "PENDING"} />
+      </div>
+
+      {/* ── FOOTER ───────────────────────────────────────────────────── */}
+      <div style={{ textAlign: "center", fontSize: "10px", color: "#888",
+                    borderTop: "1px solid #ddd", marginTop: "56px", paddingTop: "14px" }}>
+        This is a computer-generated document and does not require a signature.<br />
+        © {year} {company.name} • For inquiries: {company.email}
+      </div>
+    </div>
+  );
+
+  // ── PRINT BUTTON ──────────────────────────────────────────────────────────
   return (
     <>
-      {/* ── Print CSS injected into head ── */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #print-invoice, #print-invoice * { visibility: visible !important; }
-          #print-invoice {
-            position: fixed !important;
-            inset: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            padding: 32px !important;
-            background: white !important;
-            color: black !important;
-            z-index: 99999 !important;
-            overflow: auto !important;
-          }
-          .no-print { display: none !important; }
-        }
-      `}</style>
+      {/* Trigger button — place this wherever your existing print button is */}
+      <button
+        onClick={() => setPreview(true)}
+        style={{
+          background: "#111", color: "#fff", padding: "10px 22px",
+          fontWeight: 700, border: "none", cursor: "pointer",
+          fontSize: "13px", letterSpacing: "0.5px",
+        }}
+      >
+        🖨 Print Invoice
+      </button>
 
-      {/* ── Modal overlay (screen only) ── */}
-      <div className="no-print fixed inset-0 z-50 bg-black/70 flex items-start justify-center overflow-y-auto py-8 px-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl">
-          {/* Modal header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b">
-            <h2 className="font-bold text-lg text-navy">Invoice Preview</h2>
-            <div className="flex gap-3">
+      {/* ── FULLSCREEN PREVIEW MODAL ─────────────────────────────────── */}
+      {preview && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+            zIndex: 9999, overflowY: "auto", padding: "32px 16px",
+          }}
+        >
+          {/* action bar */}
+          <div style={{ maxWidth: "860px", margin: "0 auto 16px",
+                        display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "#fff", fontWeight: 700, fontSize: "14px" }}>
+              Print Preview
+            </span>
+            <div style={{ display: "flex", gap: "10px" }}>
               <button
-                onClick={() => window.print()}
-                className="bg-brand-red text-white font-bold px-5 py-2 rounded text-sm"
+                onClick={() => {
+                  setPreview(false);
+                  setTimeout(() => window.print(), 100);
+                }}
+                style={{ background: "#c0392b", color: "#fff", border: "none",
+                         padding: "8px 20px", fontWeight: 700, cursor: "pointer",
+                         fontSize: "13px" }}
               >
                 🖨 Print
               </button>
               <button
-                onClick={onClose}
-                className="bg-gray-100 text-navy font-bold px-5 py-2 rounded text-sm"
+                onClick={() => setPreview(false)}
+                style={{ background: "#fff", color: "#111", border: "none",
+                         padding: "8px 16px", fontWeight: 700, cursor: "pointer",
+                         fontSize: "13px" }}
               >
-                Close
+                ✕ Close
               </button>
             </div>
           </div>
 
-          {/* Invoice content — visible on screen AND in print */}
-          <div id="print-invoice" className="p-8 text-black bg-white">
-
-            {/* ── 1. Company Header ── */}
-            <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8">
-              <div className="flex items-center gap-4">
-                {company.company_logo_url ? (
-                  <img
-                    src={company.company_logo_url}
-                    alt="logo"
-                    className="h-16 w-auto object-contain"
-                  />
-                ) : (
-                  <div className="w-14 h-14 bg-black text-white flex items-center justify-center text-3xl font-black flex-shrink-0">
-                    T
-                  </div>
-                )}
-                <div>
-                  <div className="text-xl font-black uppercase tracking-wider">{companyName}</div>
-                  <div className="text-sm text-gray-600 mt-1">{companyAddress}</div>
-                  <div className="text-sm text-gray-600">{companyEmail}</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold uppercase tracking-widest">Invoice / Waybill</div>
-                <div className="text-sm mt-1 text-gray-600">Issued: {today}</div>
-                {s?.tracking_number && (
-                  <div className="mt-3 inline-block p-2 border border-gray-300">
-                    <Barcode
-                      value={s.tracking_number}
-                      height={48}
-                      width={1.4}
-                      fontSize={12}
-                      background="#ffffff"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── 2. Tracking Number + Status ── */}
-            <div className="mb-8 flex items-start justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">
-                  Tracking Number
-                </div>
-                <div className="text-3xl font-black text-red-600 tracking-widest">
-                  {s?.tracking_number || "—"}
-                </div>
-                <div className="mt-2 flex items-center gap-3 flex-wrap">
-                  <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                    {s?.status || "—"}
-                  </span>
-                  {s?.current_location && (
-                    <span className="text-sm text-gray-600">
-                      📍 {s.current_location_flag ? `${s.current_location_flag} ` : ""}
-                      {s.current_location}
-                    </span>
-                  )}
-                </div>
-              </div>
-              {/* Stamp */}
-              <div className="flex-shrink-0">
-                <Stamp status={s?.status || ""} />
-              </div>
-            </div>
-
-            {/* ── 3. Sender & Receiver ── */}
-            <div className="grid grid-cols-2 gap-8 mb-8">
-              <div>
-                <div className="font-bold uppercase text-xs tracking-widest border-b border-gray-300 pb-1 mb-3">
-                  SHIPPER (SENDER)
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="font-bold">{s?.sender_name || "—"}</div>
-                  {s?.sender_phone && <div>📞 {s.sender_phone}</div>}
-                  {s?.sender_email && <div>✉ {s.sender_email}</div>}
-                  {s?.sender_address && <div>📍 {s.sender_address}</div>}
-                </div>
-              </div>
-              <div>
-                <div className="font-bold uppercase text-xs tracking-widest border-b border-gray-300 pb-1 mb-3">
-                  CONSIGNEE (RECEIVER)
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="font-bold">{s?.receiver_name || "—"}</div>
-                  {s?.receiver_phone && <div>📞 {s.receiver_phone}</div>}
-                  {s?.receiver_email && <div>✉ {s.receiver_email}</div>}
-                  {s?.receiver_address && <div>📍 {s.receiver_address}</div>}
-                  {s?.receiver_country && <div>🌍 {s.receiver_country}</div>}
-                </div>
-              </div>
-            </div>
-
-            {/* ── 4. Shipment Details ── */}
-            <div className="mb-8">
-              <div className="font-bold uppercase text-xs tracking-widest border-b border-gray-300 pb-1 mb-3">
-                SHIPMENT DETAILS
-              </div>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                <div><span className="text-gray-500">Origin:</span> <strong>{s?.origin_label || "—"}</strong></div>
-                <div><span className="text-gray-500">Destination:</span> <strong>{s?.destination_label || "—"}</strong></div>
-                <div><span className="text-gray-500">Type:</span> <strong>{s?.package_type || "—"}</strong></div>
-                <div><span className="text-gray-500">Weight:</span> <strong>{s?.weight || "—"}</strong></div>
-                <div><span className="text-gray-500">Date Sent:</span> <strong>{s?.date_sent || "—"}</strong></div>
-                <div>
-                  <span className="text-gray-500">Expected Delivery:</span>{" "}
-                  <strong>
-                    {s?.expected_delivery_date
-                      ? new Date(s.expected_delivery_date).toLocaleDateString()
-                      : "—"}
-                  </strong>
-                </div>
-                {s?.description && (
-                  <div className="col-span-2">
-                    <span className="text-gray-500">Description:</span> {s.description}
-                  </div>
-                )}
-                <div className="col-span-2 flex items-center gap-2">
-                  <span className="text-gray-500">Status:</span>
-                  <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-0.5 rounded-full uppercase">
-                    {s?.status || "—"}
-                  </span>
-                </div>
-                {s?.comments && (
-                  <div className="col-span-2 mt-2">
-                    <div className="text-gray-500 text-xs font-bold uppercase mb-1">Comments</div>
-                    <div className="border-l-4 border-amber-400 bg-amber-50 pl-3 py-2 text-sm">
-                      {s.comments}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── 5. Billing ── */}
-            <div className="mb-8">
-              <div className="font-bold uppercase text-xs tracking-widest border-b border-gray-300 pb-1 mb-3">
-                BILLING
-              </div>
-              <div className="text-sm space-y-1">
-                <div>
-                  <span className="text-gray-500">Amount Due:</span>{" "}
-                  <strong className="text-red-600 text-lg">{amountDue}</strong>
-                </div>
-                {s?.payment_mode && (
-                  <div>
-                    <span className="text-gray-500">Payment Mode:</span> {s.payment_mode}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── 6. On Hold Details (only if On Hold) ── */}
-            {isOnHold && (
-              <div className="mb-8 border-2 border-amber-400 rounded p-4 bg-amber-50">
-                <div className="font-bold uppercase text-xs tracking-widest text-amber-700 mb-3">
-                  ⚠ CUSTOMS HOLD DETAILS
-                </div>
-                <div className="space-y-2 text-sm">
-                  {s?.hold_headline && (
-                    <div className="font-black text-base text-amber-800">{s.hold_headline}</div>
-                  )}
-                  {s?.hold_body && <div>{s.hold_body}</div>}
-                  {s?.hold_amount && (
-                    <div>
-                      <span className="text-gray-600">Hold Amount:</span>{" "}
-                      <strong className="text-red-600">{s.hold_amount}</strong>
-                    </div>
-                  )}
-                  {s?.hold_note && (
-                    <div className="italic text-gray-600">{s.hold_note}</div>
-                  )}
-                  {s?.hold_contact_email && (
-                    <div>
-                      <span className="text-gray-600">Contact:</span> {s.hold_contact_email}
-                    </div>
-                  )}
-                  {s?.payment_instruction_note && (
-                    <div className="mt-2 bg-white border border-amber-300 rounded p-3">
-                      <div className="text-xs font-bold uppercase text-gray-500 mb-1">
-                        Payment Instructions
-                      </div>
-                      {s.payment_instruction_note}
-                    </div>
-                  )}
-                  {s?.crypto_wallet_address && (
-                    <div className="mt-2">
-                      <div className="text-xs font-bold uppercase text-gray-500 mb-1">
-                        Crypto Wallet Address
-                      </div>
-                      <div className="font-mono text-xs bg-white border border-gray-200 rounded p-2 break-all">
-                        {s.crypto_wallet_address}
-                      </div>
-                    </div>
-                  )}
-                  {s?.bank_details && (
-                    <div className="mt-2">
-                      <div className="text-xs font-bold uppercase text-gray-500 mb-1">
-                        Bank Details
-                      </div>
-                      <div className="text-sm">{s.bank_details}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ── Footer ── */}
-            <div className="text-center text-xs text-gray-400 pt-6 border-t mt-8">
-              This is a computer-generated document and does not require a signature.
-              <br />
-              © {year} {companyName} • {companyEmail}
-            </div>
+          {/* invoice preview */}
+          <div style={{ background: "#fff", maxWidth: "860px", margin: "0 auto",
+                        boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
+            {InvoiceBody}
           </div>
         </div>
+      )}
+
+      {/* ── PRINT-ONLY TARGET (hidden on screen) ─────────────────────── */}
+      <div className="print-only-invoice" style={{ display: "none" }}>
+        {InvoiceBody}
       </div>
     </>
   );
