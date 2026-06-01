@@ -17,7 +17,7 @@ import SectionTitle from "@/components/SectionTitle";
 import BoldChip from "@/components/BoldChip";
 import Row from "@/components/Row";
 import PartyCard from "@/components/PartyCard";
-import Stepper from "@/components/Stepper";
+import Stepper, { getStepColor } from "@/components/Stepper";
 import Countdown from "@/components/Countdown";
 import MapInfoBar from "@/components/MapInfoBar";
 import LeafletMap from "@/components/LeafletMap";
