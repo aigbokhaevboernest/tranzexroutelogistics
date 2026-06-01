@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { getStepColor } from "./Stepper";
 
 type HistoryItem = {
   date?: string;
@@ -17,42 +18,72 @@ export default function ShipmentHistory({ history }: { history?: HistoryItem[] }
     return <div className="text-muted-foreground text-sm">No history yet.</div>;
   }
 
-  // Sort newest first by date if parsable
   const sorted = [...history].sort((a, b) => {
     const ta = a.date ? new Date(a.date).getTime() : 0;
     const tb = b.date ? new Date(b.date).getTime() : 0;
     return tb - ta;
   });
 
-  const showAll = expanded || sorted.length <= 5;
-  const visible = showAll ? sorted : sorted.slice(0, 5);
+  const LIMIT = 3;
+  const showAll = expanded || sorted.length <= LIMIT;
+  const visible = showAll ? sorted : sorted.slice(0, LIMIT);
 
   return (
     <div ref={ref}>
-      <ol className="space-y-3 transition-all">
-        {visible.map((h, i) => (
-          <li
-            key={i}
-            className={`pl-4 border-l-4 ${i === 0 ? "border-brand-red" : "border-border"} bg-secondary/40 p-3 rounded-r`}
-          >
-            <div className="text-mono text-xs text-muted-foreground">{h.date}</div>
-            {h.status && (
-              <div className="mt-1 inline-block bg-navy text-white text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded">
-                {h.status}
+      <ol className="relative">
+        {visible.map((h, i) => {
+          const isCurrent = i === 0;
+          const color = getStepColor(h.status || "");
+          return (
+            <li key={i} className="relative pl-7 pb-4 last:pb-0">
+              {/* vertical line */}
+              {i < visible.length - 1 && (
+                <span
+                  className="absolute left-[10px] top-3 bottom-0 w-0.5"
+                  style={{ background: isCurrent ? "var(--brand-red)" : "oklch(0.88 0 0)" }}
+                />
+              )}
+              {/* dot */}
+              <span
+                className="absolute left-1 top-1.5 w-4 h-4 rounded-full border-2 border-white"
+                style={{
+                  background: isCurrent ? "var(--brand-red)" : "oklch(0.78 0 0)",
+                  boxShadow: isCurrent
+                    ? "0 0 0 2px var(--brand-red), 0 0 0 4px white"
+                    : "0 0 0 2px oklch(0.85 0 0)",
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-mono text-[11px] text-muted-foreground">{h.date}</span>
+                {h.status && (
+                  <span
+                    className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full text-white"
+                    style={{ background: color }}
+                  >
+                    {h.status}
+                  </span>
+                )}
+                {h.location && (
+                  <span className="text-navy text-sm font-semibold">{h.location}</span>
+                )}
               </div>
-            )}
-            {h.location && <div className="mt-1 text-navy font-semibold">{h.location}</div>}
-            {h.remarks && <div className="text-sm text-muted-foreground mt-1">{h.remarks}</div>}
-            {h.comments && (
-              <div className="mt-2 bg-warning/20 border border-warning rounded p-2 text-sm text-navy">
-                {h.comments}
-              </div>
-            )}
-          </li>
-        ))}
+              {(h.remarks || h.comments) && (
+                <div
+                  className="mt-1.5 rounded p-2 text-sm text-navy/80 border"
+                  style={{
+                    background: "oklch(0.96 0.005 260 / 0.5)",
+                    borderColor: "oklch(0.91 0.01 260)",
+                  }}
+                >
+                  {h.remarks || h.comments}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ol>
-      {sorted.length > 5 && (
-        <div className="mt-4 flex justify-center">
+      {sorted.length > LIMIT && (
+        <div className="mt-3 flex justify-center">
           <button
             onClick={() => {
               if (expanded) {
@@ -62,15 +93,15 @@ export default function ShipmentHistory({ history }: { history?: HistoryItem[] }
                 setExpanded(true);
               }
             }}
-            className="inline-flex items-center gap-2 border-2 border-navy text-navy font-bold uppercase tracking-wider text-xs px-5 py-2.5 rounded hover:bg-navy hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 border border-navy text-navy font-bold uppercase tracking-wider text-[10px] px-3 py-1.5 rounded hover:bg-navy hover:text-white transition-colors"
           >
             {expanded ? (
               <>
-                View Less <ChevronUp className="w-4 h-4" />
+                View Less <ChevronUp className="w-3 h-3" />
               </>
             ) : (
               <>
-                View All History <ChevronDown className="w-4 h-4" />
+                View All History <ChevronDown className="w-3 h-3" />
               </>
             )}
           </button>
