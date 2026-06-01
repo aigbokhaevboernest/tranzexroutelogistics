@@ -19,14 +19,14 @@ export default function Countdown({ target }: { target?: string | null }) {
     { label: "SEC", v: s },
   ];
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-1.5">
       {cells.map((c) => (
         <div
           key={c.label}
-          className="bg-navy-deep border border-navy text-white px-3 py-2 text-center min-w-[60px] rounded shadow"
+          className="bg-navy-deep border border-navy text-white px-2 py-1 text-center min-w-[42px] rounded"
         >
-          <div className="text-mono font-bold text-xl leading-none">{String(c.v).padStart(2, "0")}</div>
-          <div className="text-[10px] text-white/70 mt-1 font-bold tracking-wider">{c.label}</div>
+          <div className="text-mono font-bold text-sm leading-none">{String(c.v).padStart(2, "0")}</div>
+          <div className="text-[8px] text-white/70 mt-0.5 font-bold tracking-wider">{c.label}</div>
         </div>
       ))}
     </div>

@@ -17,7 +17,7 @@ import SectionTitle from "@/components/SectionTitle";
 import BoldChip from "@/components/BoldChip";
 import Row from "@/components/Row";
 import PartyCard from "@/components/PartyCard";
-import Stepper from "@/components/Stepper";
+import Stepper, { getStepColor } from "@/components/Stepper";
 import Countdown from "@/components/Countdown";
 import MapInfoBar from "@/components/MapInfoBar";
 import LeafletMap from "@/components/LeafletMap";
@@ -281,7 +281,7 @@ export default function TrackingPage() {
                   </div>
                   <button
                     onClick={() => window.print()}
-                    className="bg-navy text-white font-bold px-4 py-2 rounded flex items-center gap-2 text-sm"
+                    className="bg-navy text-white font-bold px-4 py-2 rounded-none flex items-center gap-2 text-sm"
                   >
                     <Printer className="w-4 h-4" /> Print Invoice
                   </button>
@@ -295,7 +295,7 @@ export default function TrackingPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
                     <BoldChip label="Status" value={s.status} color="var(--brand-red)" valueClass="text-brand-red" />
                     <BoldChip
                       label="Current Location"
@@ -315,13 +315,19 @@ export default function TrackingPage() {
                 )}
 
                 {s.expected_delivery_date && !delivered && (
-                  <div className="mt-5">
-                    <div className="text-xs uppercase tracking-widest text-muted-foreground font-bold mb-3">
+                  <div className="mt-4">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-2">
                       Estimated Delivery
                     </div>
-                    <Countdown target={s.expected_delivery_date} />
-                    <div className="mt-3 text-sm text-muted-foreground">
-                      Scheduled: {new Date(s.expected_delivery_date).toLocaleString()}, Before End of Day
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <Countdown target={s.expected_delivery_date} />
+                      <div className="h-10 w-px bg-border" />
+                      <div className="text-sm leading-tight">
+                        <div className="font-bold text-navy">
+                          Scheduled: {new Date(s.expected_delivery_date).toLocaleDateString()}
+                        </div>
+                        <div className="text-muted-foreground text-xs">Before End of Day</div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -349,9 +355,12 @@ export default function TrackingPage() {
                   <div className="sm:col-span-2">
                     <Row label="Description" value={s.description} />
                   </div>
-                  <div className="sm:col-span-2 mt-2">
-                    <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider mb-1">Status</div>
-                    <span className="inline-block bg-brand-red text-white px-3 py-1 rounded text-xs font-bold uppercase tracking-wider">
+                  <div className="sm:col-span-2 mt-2 flex items-center gap-3 py-2 border-b border-border">
+                    <span className="text-muted-foreground uppercase text-xs font-bold tracking-wider">Status</span>
+                    <span
+                      className="inline-block text-white px-3 py-1 rounded-none text-xs font-bold uppercase tracking-wider"
+                      style={{ background: getStepColor(s.status) }}
+                    >
                       {s.status}
                     </span>
                   </div>

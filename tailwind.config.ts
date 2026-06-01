@@ -45,8 +45,8 @@ export default {
           "100%": { boxShadow: "0 0 0 16px rgba(239,68,68,0)" },
         },
         "glow-pulse": {
-          "0%,100%": { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(239,68,68,0.0)" },
-          "50%": { transform: "scale(1.08)", boxShadow: "0 0 24px 6px rgba(239,68,68,0.5)" },
+          "0%,100%": { boxShadow: "0 0 0 0 currentColor, 0 0 12px 2px currentColor", transform: "scale(1)" },
+          "50%": { boxShadow: "0 0 0 10px transparent, 0 0 22px 6px currentColor", transform: "scale(1.08)" },
         },
         "return-arrow": {
           "0%,100%": { transform: "translateX(0)" },
