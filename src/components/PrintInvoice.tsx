@@ -74,7 +74,6 @@ function Stamp({ status }: { status: string }) {
 export default function PrintInvoice({ s, open, onClose }: { s: any; open: boolean; onClose: () => void }) {
   const [logoUrl, setLogoUrl]         = useState<string | null>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
-  const [preview, setPreview]         = useState(false);
 
   // fetch company settings from hold_settings
   useEffect(() => {
@@ -106,6 +105,8 @@ export default function PrintInvoice({ s, open, onClose }: { s: any; open: boole
   const amountDue   = s?.amount_due || s?.hold_amount || "—";
   const sc          = statusColour(s?.status || "");
 
+  if (!open) return null;
+  
   // ── invoice JSX (shared between preview modal and print target) ───────────
   const InvoiceBody = (
     <div
