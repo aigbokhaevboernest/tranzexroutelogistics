@@ -71,7 +71,7 @@ function Stamp({ status }: { status: string }) {
 }
 
 // ── main component ─────────────────────────────────────────────────────────
-export default function PrintInvoice({ s }: { s: any }) {
+export default function PrintInvoice({ s, open, onClose }: { s: any; open: boolean; onClose: () => void }) {
   const [logoUrl, setLogoUrl]         = useState<string | null>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [preview, setPreview]         = useState(false);
