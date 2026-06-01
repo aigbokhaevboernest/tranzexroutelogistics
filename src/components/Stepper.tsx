@@ -15,8 +15,12 @@ export const ALL_STEPS: StepDef[] = [
 
 const FAILED_STATUSES = ["FAILED", "Returned To Warehouse"];
 
+function normalize(status: string) {
+  return (status || "").toLowerCase().trim();
+}
+
 function findActiveIdx(steps: StepDef[], status: string) {
-  const norm = (status || "").toLowerCase().trim();
+  const norm = normalize(status);
   const idx = steps.findIndex((s) => s.key.toLowerCase() === norm);
   if (idx >= 0) return idx;
   if (norm.includes("origin")) return 0;
@@ -26,6 +30,20 @@ function findActiveIdx(steps: StepDef[], status: string) {
   if (norm.includes("pick")) return steps.findIndex((s) => s.key === "Pick-Up");
   if (norm.includes("deliver")) return steps.length - 1;
   return 0;
+}
+
+export function getStepColor(status: string): string {
+  if (FAILED_STATUSES.includes(status)) return "oklch(0.55 0.21 27)";
+  const norm = normalize(status);
+  const found = ALL_STEPS.find((s) => s.key.toLowerCase() === norm);
+  if (found) return found.color;
+  if (norm.includes("origin")) return ALL_STEPS[0].color;
+  if (norm.includes("transit")) return ALL_STEPS[1].color;
+  if (norm.includes("hold")) return ALL_STEPS[2].color;
+  if (norm.includes("airport")) return ALL_STEPS[3].color;
+  if (norm.includes("pick")) return ALL_STEPS[4].color;
+  if (norm.includes("deliver")) return ALL_STEPS[5].color;
+  return "oklch(0.45 0.02 260)";
 }
 
 export default function Stepper({ status, showAirport }: { status: string; showAirport: boolean }) {
@@ -46,14 +64,19 @@ export default function Stepper({ status, showAirport }: { status: string; showA
             <div key={s.key} className="flex-1 flex flex-col items-center text-center relative">
               <div
                 className={cn(
-                  "w-14 h-14 rounded-full flex items-center justify-center text-white shadow relative z-10",
+                  "w-14 h-14 rounded-full flex items-center justify-center text-white relative z-10",
                   active && "animate-glow-pulse"
                 )}
-                style={{ background: bg, ...(active ? { boxShadow: `0 0 0 0 ${s.color}` } : {}) }}
+                style={{ background: bg, color: s.color }}
               >
-                <s.icon className="w-6 h-6" />
+                <s.icon className="w-6 h-6 text-white" />
               </div>
               <div className="mt-2 text-xs font-bold text-navy uppercase">{s.label}</div>
+              {active && (
+                <div className="text-[10px] font-semibold mt-0.5" style={{ color: s.color }}>
+                  Current step
+                </div>
+              )}
               {i < steps.length - 1 && (
                 <div
                   className="absolute top-7 left-1/2 w-full h-0.5"
@@ -74,16 +97,15 @@ export default function Stepper({ status, showAirport }: { status: string; showA
           const isLast = i === steps.length - 1;
           return (
             <div key={s.key} className="flex items-stretch gap-4">
-              {/* Circle + connector column */}
               <div className="flex flex-col items-center">
                 <div
                   className={cn(
                     "w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0",
                     active && "animate-glow-pulse"
                   )}
-                  style={{ background: bg }}
+                  style={{ background: bg, color: s.color }}
                 >
-                  <s.icon className="w-5 h-5" />
+                  <s.icon className="w-5 h-5 text-white" />
                 </div>
                 {!isLast && (
                   <div
@@ -95,7 +117,6 @@ export default function Stepper({ status, showAirport }: { status: string; showA
                   />
                 )}
               </div>
-              {/* Label */}
               <div className={cn("pt-3", !isLast && "pb-6")}>
                 <div className="text-sm font-bold text-navy uppercase">{s.label}</div>
                 {active && (
