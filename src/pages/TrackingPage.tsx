@@ -114,8 +114,10 @@ export default function TrackingPage() {
       } else {
         setError(null);
         setShipment((prev: any) => {
-          // Avoid unnecessary re-renders if nothing changed
-          if (prev && prev.updated_at === data.updated_at) return prev;
+          // Avoid unnecessary re-renders only if the row is byte-identical.
+          // Comparing updated_at alone misses cases where downstream JSON
+          // fields (like history) change without a timestamp bump.
+          if (prev && JSON.stringify(prev) === JSON.stringify(data)) return prev;
           return data;
         });
       }
@@ -296,7 +298,7 @@ export default function TrackingPage() {
                   </div>
                 ) : (
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <BoldChip label="Status" value={s.status} color="var(--brand-red)" valueClass="text-brand-red" />
+                    <BoldChip label="Status" value={s.status} color={getStepColor(s.status)} valueClass="font-extrabold" valueStyle={{ color: getStepColor(s.status) }} />
                     <BoldChip
                       label="Current Location"
                       value={
@@ -355,14 +357,16 @@ export default function TrackingPage() {
                   <div className="sm:col-span-2">
                     <Row label="Description" value={s.description} />
                   </div>
-                  <div className="sm:col-span-2 mt-2 flex items-center gap-3 py-2 border-b border-border">
-                    <span className="text-muted-foreground uppercase text-xs font-bold tracking-wider">Status</span>
-                    <span
-                      className="inline-block text-white px-3 py-1 rounded-none text-xs font-bold uppercase tracking-wider"
-                      style={{ background: getStepColor(s.status) }}
-                    >
-                      {s.status}
-                    </span>
+                  <div className="sm:col-span-2 grid grid-cols-[140px_1fr] gap-3 py-2 border-b border-border text-sm items-center">
+                    <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider">Status</div>
+                    <div>
+                      <span
+                        className="inline-block text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
+                        style={{ background: getStepColor(s.status) }}
+                      >
+                        {s.status}
+                      </span>
+                    </div>
                   </div>
                   {s.comments && (
                     <div className="sm:col-span-2 mt-3">
