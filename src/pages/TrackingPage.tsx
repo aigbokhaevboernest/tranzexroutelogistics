@@ -289,9 +289,7 @@ export default function TrackingPage() {
   <Printer className="w-4 h-4" /> Print Invoice
 </button>
 
-                    <Printer className="w-4 h-4" /> Print Invoice
-                  </button>
-                </div>
+                    
 
                 {delivered ? (
                   <div className="mt-5 bg-success/15 border border-success rounded p-4 flex items-center gap-3 text-navy">
