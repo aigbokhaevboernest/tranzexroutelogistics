@@ -67,6 +67,7 @@ export default function TrackingPage() {
   const [error, setError] = useState<string | null>(null);
   const [dismissBanner, setDismissBanner] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [printPreview, setPrintPreview] = useState(false);
 
   // Keep input in sync if URL changes (back/forward nav)
   useEffect(() => {
