@@ -282,9 +282,12 @@ export default function TrackingPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => window.print()}
-                    className="bg-navy text-white font-bold px-4 py-2 rounded-none flex items-center gap-2 text-sm"
-                  >
+  onClick={() => setPrintPreview(true)}
+  className="bg-navy text-white font-bold px-4 py-2 rounded-none flex items-center gap-2 text-sm"
+>
+  <Printer className="w-4 h-4" /> Print Invoice
+</button>
+
                     <Printer className="w-4 h-4" /> Print Invoice
                   </button>
                 </div>
@@ -441,7 +444,8 @@ export default function TrackingPage() {
                 Last updated: {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
               </div>
 
-              <PrintInvoice s={s} />
+              <PrintInvoice s={s} open={printPreview} onClose={() => setPrintPreview(false)} />
+
               <PaymentModal
                 open={payOpen}
                 onClose={() => setPayOpen(false)}
