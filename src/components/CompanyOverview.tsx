@@ -7,19 +7,19 @@ const CARDS = [
     img: img1,
     kicker: "ANYWHERE SHIPPING",
     title: "Global Customs & Clearance",
-    body: "We handle import/export documents and customs clearance across 80+ countries so your cargo keeps moving.",
+    body: "We handle import/export documentation and customs clearance across 80+ countries, keeping your cargo moving without delays. Tranzex Logistics teams navigate tariff classifications, duty calculations, and regulatory requirements with precision, so your shipments clear borders smoothly every time. Whether you’re importing raw materials, finished goods, or time-sensitive parcels, we provide full end-to-end documentation support and real-time status updates to keep your shipments on schedule.​​​​​​​​​​​​​​​​",
   },
   {
     img: img2,
-    kicker: "INSIGHTS & INSPIRATION",
+    kicker: "TIME-CRITICAL DELIVERY",
     title: "Door-to-Door Delivery",
-    body: "From warehouse pickup to last-mile delivery, our trained couriers handle every shipment with care.",
+    body: "From warehouse pickup to last-mile delivery, When timing is everything, we deliver, our time-critical delivery service gets your shipment there guaranteed. whether you need same-day express or next-business-day delivery. Every shipment is handled door-to-door with proactive customs clearance, temperature-controlled options for sensitive cargo, and 24/7 live tracking from warehouse pickup to final delivery.​​​​​​​​​​​​​​​​",
   },
   {
     img: img3,
-    kicker: "YOUR FREIGHT DEADLINES",
+    kicker: "Your cargo’s location and status at your fingertips",
     title: "Real-Time Tracking",
-    body: "Live shipment status, instant alerts, and an always-up-to-date map keep you in control end to end.",
+    body: "Gone are the days of waiting on hold for tracking updates. With Tranzex Route Logistics, you get instant, real-time visibility into every stage of your shipment's journey. Our advanced tracking portal displays live location data, estimated delivery windows, customs status, and any transit exceptions — all accessible from any device, anywhere in the world, without ever contacting support.",
   },
 ];
 
