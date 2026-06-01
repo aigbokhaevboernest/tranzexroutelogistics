@@ -7,82 +7,117 @@ export const COMPANY = {
   phone: "+63 (2) 8123 4567",
 };
 
-function PrintInvoice({ shipment }: { shipment: Shipment }) {
-  const today = new Date().toLocaleDateString();
+export default function PrintInvoice({ s }: { s: any }) {
+  const today = new Date().toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const year = new Date().getFullYear();
+
   return (
-    <div id="print-invoice" className="hidden print:block text-black">
-      <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-black text-white grid place-items-center font-extrabold">T</div>
-            <div className="text-2xl font-extrabold uppercase tracking-wider">{COMPANY.name}</div>
-          </div>
-          <div className="text-xs mt-2 leading-snug">
-            {COMPANY.address}<br />
-            {COMPANY.email} · {COMPANY.phone}
+    <div id="print-invoice" className="hidden print:block bg-white text-black p-8 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 bg-black text-white flex items-center justify-center text-3xl font-black">T</div>
+          <div>
+            <div className="text-2xl font-bold uppercase tracking-wider">{COMPANY.name}</div>
+            <div className="text-sm text-gray-600 mt-1">{COMPANY.address}</div>
+            <div className="text-sm text-gray-600">{COMPANY.email} • {COMPANY.phone}</div>
           </div>
         </div>
+
         <div className="text-right">
-          <div className="text-xs uppercase tracking-widest text-gray-600">Invoice / Waybill</div>
-          <div className="text-xs">Issued: {today}</div>
-          <div className="mt-2">
-            <Barcode value={shipment.tracking_number} height={48} width={1.4} fontSize={12} background="#ffffff" />
+          <div className="text-3xl font-bold uppercase tracking-widest">Invoice / Waybill</div>
+          <div className="text-sm mt-1">Issued: {today}</div>
+          
+          {s?.tracking_number && (
+            <div className="mt-4 inline-block p-2 border border-gray-300">
+              <Barcode 
+                value={s.tracking_number} 
+                height={55} 
+                width={1.6} 
+                fontSize={13} 
+                background="#ffffff"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Shipper & Consignee */}
+      <div className="grid grid-cols-2 gap-8 mb-8">
+        <div>
+          <div className="font-bold uppercase text-sm tracking-widest border-b pb-1 mb-3">SHIPPER</div>
+          <div className="space-y-1 text-sm">
+            <div><strong>{s?.sender_name || "—"}</strong></div>
+            <div>{s?.sender_phone}</div>
+            <div>{s?.sender_email}</div>
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold uppercase text-sm tracking-widest border-b pb-1 mb-3">CONSIGNEE (RECEIVER)</div>
+          <div className="space-y-1 text-sm">
+            <div><strong>{s?.receiver_name || "—"}</strong></div>
+            <div>{s?.receiver_phone}</div>
+            <div>{s?.receiver_email}</div>
+            <div>{s?.receiver_address}</div>
+            <div>{s?.receiver_country}</div>
           </div>
         </div>
       </div>
 
-      <p className="text-xs text-gray-700 mb-5 leading-relaxed">
-        This document confirms the shipment record held by {COMPANY.name}. It serves as a proof-of-shipment
-        waybill and itemized invoice for the consignment described below. Please retain a copy for
-        customs clearance, billing reconciliation, and pickup verification. For any discrepancy contact
-        our support team at {COMPANY.email}.
-      </p>
-
-      <div className="grid grid-cols-2 gap-6 mb-6">
-        <div>
-          <div className="text-xs font-extrabold uppercase tracking-widest border-b border-black pb-1 mb-2">Shipper</div>
-          <InvoiceRow k="Name" v={shipment.sender_name} />
-          <InvoiceRow k="Phone" v={shipment.sender_phone} />
-          <InvoiceRow k="Email" v={shipment.sender_email} />
-        </div>
-        <div>
-          <div className="text-xs font-extrabold uppercase tracking-widest border-b border-black pb-1 mb-2">Consignee</div>
-          <InvoiceRow k="Name" v={shipment.receiver_name} />
-          <InvoiceRow k="Phone" v={shipment.receiver_phone} />
-          <InvoiceRow k="Email" v={shipment.receiver_email} />
-          <InvoiceRow k="Address" v={shipment.receiver_address} />
-          <InvoiceRow k="Country" v={shipment.receiver_country} />
+      {/* Package Details */}
+      <div className="mb-8">
+        <div className="font-bold uppercase text-sm tracking-widest border-b pb-1 mb-3">PACKAGE DETAILS</div>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <div><span className="text-gray-600">Origin:</span> {s?.origin_label || "—"}</div>
+          <div><span className="text-gray-600">Destination:</span> {s?.destination_label || "—"}</div>
+          <div><span className="text-gray-600">Type:</span> {s?.package_type || "—"}</div>
+          <div><span className="text-gray-600">Weight:</span> {s?.weight || "—"}</div>
+          <div><span className="text-gray-600">Date Sent:</span> {s?.date_sent || "—"}</div>
+          <div><span className="text-gray-600">Expected Delivery:</span> {s?.expected_delivery_date ? new Date(s.expected_delivery_date).toLocaleDateString() : "—"}</div>
+          
+          {s?.description && (
+            <div className="col-span-2 mt-2">
+              <span className="text-gray-600">Description:</span> {s.description}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="mb-6">
-        <div className="text-xs font-extrabold uppercase tracking-widest border-b border-black pb-1 mb-2">Package Details</div>
-        <div className="grid grid-cols-2 gap-x-6">
-          <InvoiceRow k="Tracking #" v={shipment.tracking_number} />
-          <InvoiceRow k="Type" v={shipment.package_type} />
-          <InvoiceRow k="Weight" v={shipment.weight} />
-          <InvoiceRow k="Date Sent" v={shipment.date_sent} />
-          <InvoiceRow k="Expected Delivery" v={shipment.expected_delivery_date ? new Date(shipment.expected_delivery_date).toLocaleDateString() : null} />
-          <InvoiceRow k="Status" v={shipment.status} />
+      {/* Billing */}
+      <div className="mb-8">
+        <div className="font-bold uppercase text-sm tracking-widest border-b pb-1 mb-3">BILLING</div>
+        <div className="text-sm space-y-1">
+          <div>
+            <span className="text-gray-600">Amount Due:</span>{" "}
+            <strong>₱{(Number(s?.amount_due ?? 0)).toLocaleString()}</strong>
+          </div>
+          {s?.payment_mode && (
+            <div>
+              <span className="text-gray-600">Payment Mode:</span> {s.payment_mode}
+            </div>
+          )}
         </div>
-        <InvoiceRow k="Description" v={shipment.description} />
       </div>
 
-      <div className="mb-6">
-        <div className="text-xs font-extrabold uppercase tracking-widest border-b border-black pb-1 mb-2">Billing</div>
-        <InvoiceRow k="Amount Due" v={`${(shipment.amount_due ?? 0).toLocaleString()} pesos`} />
-        <InvoiceRow k="Payment Mode" v={shipment.payment_mode} />
-      </div>
-
-      {shipment.comments && (
-        <div className="mb-6">
-          <div className="text-xs font-extrabold uppercase tracking-widest border-b border-black pb-1 mb-2">Comments</div>
-          <p className="text-sm">{shipment.comments}</p>
+      {/* Comments */}
+      {s?.comments && (
+        <div className="mb-8">
+          <div className="font-bold uppercase text-sm tracking-widest border-b pb-1 mb-3">COMMENTS</div>
+          <div className="text-sm border-l-4 border-amber-400 pl-4 py-2 bg-amber-50">
+            {s.comments}
+          </div>
         </div>
       )}
 
-      <div className="text-[10px] text-gray-600 border-t pt-3 mt-8">
-        This invoice is generated electronically and is valid without signature. © {new Date().getFullYear()} {COMPANY.name}.
+      {/* Footer */}
+      <div className="text-center text-xs text-gray-500 pt-8 border-t mt-10">
+        This is a computer-generated document and does not require a signature.<br />
+        © {year} {COMPANY.name} • For inquiries: {COMPANY.email}
       </div>
     </div>
   );
