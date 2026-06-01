@@ -25,7 +25,7 @@ const SLIDES = [
   },
 ];
 
-function useTypewriter(words: string, speed = 120, pause = 2000) {
+function useTypewriter(words: string, speed = 120, pause = 3000) {
   const [text, setText] = useState("");
   useEffect(() => {
     let i = 0;
@@ -57,7 +57,7 @@ export default function HeroSlider() {
 
   useEffect(() => {
     if (hover) return;
-    intervalRef.current = setInterval(() => setIdx((i) => (i + 1) % SLIDES.length), 6000);
+    intervalRef.current = setInterval(() => setIdx((i) => (i + 1) % SLIDES.length), 8000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -79,7 +79,7 @@ export default function HeroSlider() {
       {SLIDES.map((s, i) => (
         <div
           key={i}
-          className={`absolute inset-0 transition-opacity duration-1500 ${i === idx ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 transition-opacity duration-2000 ${i === idx ? "opacity-100" : "opacity-0"}`}
           aria-hidden={i !== idx}
         >
           <img
