@@ -298,7 +298,7 @@ export default function TrackingPage() {
                   </div>
                 ) : (
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <BoldChip label="Status" value={s.status} color="var(--brand-red)" valueClass="text-brand-red" />
+                    <BoldChip label="Status" value={s.status} color={getStepColor(s.status)} valueClass="font-extrabold" valueStyle={{ color: getStepColor(s.status) }} />
                     <BoldChip
                       label="Current Location"
                       value={
