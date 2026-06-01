@@ -52,12 +52,12 @@ export default function HeroSlider() {
   const [idx, setIdx] = useState(0);
   const [hover, setHover] = useState(false);
   const [query, setQuery] = useState("");
-  const placeholder = useTypewriter("Enter Your Cargo Tracking Number");
+  const placeholder = useTypewriter("Enter Your Tracking Number");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (hover) return;
-    intervalRef.current = setInterval(() => setIdx((i) => (i + 1) % SLIDES.length), 4500);
+    intervalRef.current = setInterval(() => setIdx((i) => (i + 1) % SLIDES.length), 6000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -79,7 +79,7 @@ export default function HeroSlider() {
       {SLIDES.map((s, i) => (
         <div
           key={i}
-          className={`absolute inset-0 transition-opacity duration-1000 ${i === idx ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 transition-opacity duration-1500 ${i === idx ? "opacity-100" : "opacity-0"}`}
           aria-hidden={i !== idx}
         >
           <img
