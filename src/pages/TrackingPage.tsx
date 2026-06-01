@@ -179,7 +179,7 @@ export default function TrackingPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Enter tracking number, e.g. TRK123456"
+                placeholder="Enter tracking number"
                 className="flex-1 px-5 py-4 text-navy text-mono text-sm outline-none"
               />
               <button type="submit" className="bg-brand-red text-white font-bold px-6 flex items-center gap-2">
