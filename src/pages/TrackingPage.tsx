@@ -357,14 +357,16 @@ export default function TrackingPage() {
                   <div className="sm:col-span-2">
                     <Row label="Description" value={s.description} />
                   </div>
-                  <div className="sm:col-span-2 mt-2 flex items-center gap-3 py-2 border-b border-border">
-                    <span className="text-muted-foreground uppercase text-xs font-bold tracking-wider">Status</span>
-                    <span
-                      className="inline-block text-white px-3 py-1 rounded-none text-xs font-bold uppercase tracking-wider"
-                      style={{ background: getStepColor(s.status) }}
-                    >
-                      {s.status}
-                    </span>
+                  <div className="sm:col-span-2 grid grid-cols-[140px_1fr] gap-3 py-2 border-b border-border text-sm items-center">
+                    <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider">Status</div>
+                    <div>
+                      <span
+                        className="inline-block text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
+                        style={{ background: getStepColor(s.status) }}
+                      >
+                        {s.status}
+                      </span>
+                    </div>
                   </div>
                   {s.comments && (
                     <div className="sm:col-span-2 mt-3">
