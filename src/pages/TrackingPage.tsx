@@ -114,8 +114,10 @@ export default function TrackingPage() {
       } else {
         setError(null);
         setShipment((prev: any) => {
-          // Avoid unnecessary re-renders if nothing changed
-          if (prev && prev.updated_at === data.updated_at) return prev;
+          // Avoid unnecessary re-renders only if the row is byte-identical.
+          // Comparing updated_at alone misses cases where downstream JSON
+          // fields (like history) change without a timestamp bump.
+          if (prev && JSON.stringify(prev) === JSON.stringify(data)) return prev;
           return data;
         });
       }
