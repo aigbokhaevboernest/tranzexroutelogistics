@@ -59,8 +59,6 @@ export default function TrackingPage() {
   const [params, setParams] = useSearchParams();
   const urlN = params.get("n") || "";
   const [query, setQuery] = useState(urlN);
-  // Source of truth for which shipment to fetch is the URL query string —
-  // this prevents flash/jump on refresh or direct URL access.
   const submitted = urlN;
   const [shipment, setShipment] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -69,7 +67,6 @@ export default function TrackingPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [printPreview, setPrintPreview] = useState(false);
 
-  // Keep input in sync if URL changes (back/forward nav)
   useEffect(() => {
     setQuery(urlN);
   }, [urlN]);
@@ -115,9 +112,6 @@ export default function TrackingPage() {
       } else {
         setError(null);
         setShipment((prev: any) => {
-          // Avoid unnecessary re-renders only if the row is byte-identical.
-          // Comparing updated_at alone misses cases where downstream JSON
-          // fields (like history) change without a timestamp bump.
           if (prev && JSON.stringify(prev) === JSON.stringify(data)) return prev;
           return data;
         });
@@ -283,13 +277,12 @@ export default function TrackingPage() {
                     </div>
                   </div>
                   <button
-  onClick={() => setPrintPreview(true)}
-  className="bg-navy text-white font-bold px-4 py-2 rounded-none flex items-center gap-2 text-sm"
->
-  <Printer className="w-4 h-4" /> Print Invoice
-</button>
-
-                    
+                    onClick={() => setPrintPreview(true)}
+                    className="bg-navy text-white font-bold px-4 py-2 rounded-none flex items-center gap-2 text-sm"
+                  >
+                    <Printer className="w-4 h-4" /> Print Invoice
+                  </button>
+                </div>
 
                 {delivered ? (
                   <div className="mt-5 bg-success/15 border border-success rounded p-4 flex items-center gap-3 text-navy">
@@ -335,9 +328,7 @@ export default function TrackingPage() {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* (Stepper moved below Shipment Details) */}
+              </div>{/* ← this closing </div> was missing */}
 
               {/* 1. SHIPMENT DETAILS */}
               <div className="bg-white rounded-md p-6 border border-border">
