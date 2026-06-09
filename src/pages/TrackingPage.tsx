@@ -25,7 +25,6 @@ import PaymentModal from "@/components/PaymentModal";
 import PrintInvoice from "@/components/PrintInvoice";
 import ShipmentHistory from "@/components/ShipmentHistory";
 import trackingHero from "@/assets/tracking-hero.jpg";
-import packageImg from "@/assets/package.jpg";
 
 const COMPANY = {
   name: "Tranzex Route Logistics",
@@ -333,13 +332,16 @@ export default function TrackingPage() {
               {/* 1. SHIPMENT DETAILS */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipment Details</SectionTitle>
-                <div className="w-full bg-secondary rounded-md overflow-hidden border border-border flex items-center justify-center">
-                  <img
-                    src={s.package_image_url || packageImg}
-                    alt="package"
-                    className="w-full max-h-[420px] object-contain"
-                  />
-                </div>
+{s.package_image_url && s.show_image && (
+  <div className="w-full bg-secondary rounded-md overflow-hidden border border-border flex items-center justify-center">
+    <img
+      src={s.package_image_url}
+      alt="package"
+      className="w-full max-h-[420px] object-contain"
+    />
+  </div>
+)}
+
                 <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                   <Row label="Origin" value={s.origin_label} />
                   <Row label="Destination" value={s.destination_label} />
