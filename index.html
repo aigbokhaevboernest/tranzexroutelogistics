@@ -20,6 +20,42 @@
       }
     </script>
     <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+<script>
+  window.addEventListener('load', function () {
+    // Get browser language e.g. "fr", "es", "zh-CN"
+    const browserLang = navigator.language || navigator.userLanguage;
+    const lang = browserLang.split('-')[0]; // get base language code
+
+    // Don't translate if already English
+    if (lang === 'en') return;
+
+    // Wait for Google Translate to fully load
+    const interval = setInterval(function () {
+      const select = document.querySelector('.goog-te-combo');
+      if (!select) return;
+      clearInterval(interval);
+
+      // Map browser code to Google Translate code
+      const langMap = {
+        zh: 'zh-CN',
+        pt: 'pt',
+        fr: 'fr',
+        es: 'es',
+        de: 'de',
+        ar: 'ar',
+        ru: 'ru',
+        ja: 'ja',
+        ko: 'ko',
+        it: 'it',
+        hi: 'hi',
+      };
+
+      const targetLang = langMap[lang] || lang;
+      select.value = targetLang;
+      select.dispatchEvent(new Event('change'));
+    }, 500);
+  });
+</script>
 
     <style>
       #google_translate_element { display: none !important; }
