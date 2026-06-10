@@ -1,7 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Truck, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const LOGO_URL =
+  "https://nzideivdechbxhepmlvz.supabase.co/storage/v1/object/public/shipment-assets/Tranzexroute.PNG";
 
 const LINKS = [
   { to: "/", label: "Home" },
@@ -11,15 +14,8 @@ const LINKS = [
 ];
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const loc = useLocation();
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    onScroll();
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
   useEffect(() => {
     setOpen(false);
   }, [loc.pathname, loc.hash]);
@@ -29,33 +25,21 @@ export default function Navbar() {
       document.body.style.overflow = "";
     };
   }, [open]);
-  const onHome = loc.pathname === "/";
-  const solid = scrolled || !onHome;
   return (
     <header
-      className={cn(
-        "fixed top-0 inset-x-0 z-50 transition-all duration-300",
-        solid ? "bg-white/95 shadow-md backdrop-blur" : "bg-transparent"
-      )}
+      className="fixed top-0 inset-x-0 z-50 shadow-md"
+      style={{ backgroundColor: "#2F3742" }}
     >
       <div className="max-w-7xl mx-auto h-16 px-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-md bg-brand-red flex items-center justify-center text-white">
-            <Truck className="w-5 h-5" />
-          </div>
-          <span className={cn("text-display font-extrabold text-xl tracking-wide", solid ? "text-navy" : "text-white")}>
-            TRANZEX <span className="text-brand-red">ROUTE</span>
-          </span>
+          <img src={LOGO_URL} alt="Tranzex Route" className="h-8 w-auto object-contain" />
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm font-semibold">
           {LINKS.map((l) => (
             <Link
               key={l.label}
               to={l.to}
-              className={cn(
-                "hover:text-brand-red transition-colors",
-                solid ? "text-navy" : "text-white"
-              )}
+              className="text-white hover:text-brand-red transition-colors"
             >
               {l.label}
             </Link>

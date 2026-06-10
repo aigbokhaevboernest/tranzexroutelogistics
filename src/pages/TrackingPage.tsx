@@ -332,15 +332,25 @@ export default function TrackingPage() {
               {/* 1. SHIPMENT DETAILS */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipment Details</SectionTitle>
-{s.package_image_url && s.show_image && (
-  <div className="w-full bg-secondary rounded-md overflow-hidden border border-border flex items-center justify-center">
-    <img
-      src={s.package_image_url}
-      alt="package"
-      className="w-full max-h-[420px] object-contain"
-    />
-  </div>
-)}
+{(() => {
+  const imgSrc = delivered && s.proof_of_delivery_url ? s.proof_of_delivery_url : s.package_image_url;
+  const showImg = delivered ? !!s.proof_of_delivery_url : (s.package_image_url && s.show_image);
+  if (!showImg) return null;
+  return (
+    <div className="w-full bg-secondary rounded-md overflow-hidden border border-border flex flex-col items-center justify-center">
+      <img
+        src={imgSrc}
+        alt={delivered ? "proof of delivery" : "package"}
+        className="w-full max-h-[420px] object-contain"
+      />
+      {delivered && (
+        <div className="w-full text-center text-xs uppercase tracking-widest font-bold text-success py-2 bg-success/10 border-t border-border">
+          Proof of Delivery
+        </div>
+      )}
+    </div>
+  );
+})()}
 
                 <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                   <Row label="Origin" value={s.origin_label} />
@@ -424,13 +434,6 @@ export default function TrackingPage() {
                 <LeafletMap origin={origin} current={current} destination={destination} />
               </div>
 
-              {/* 7. PROOF OF DELIVERY */}
-              {delivered && s.proof_of_delivery_url && (
-                <div className="bg-white rounded-md p-6 border border-border">
-                  <SectionTitle>Proof of Delivery</SectionTitle>
-                  <img src={s.proof_of_delivery_url} alt="proof" className="w-full max-w-md rounded-md border border-border" />
-                </div>
-              )}
 
               <div className="text-xs text-muted-foreground text-right">
                 Last updated: {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
@@ -446,6 +449,9 @@ export default function TrackingPage() {
                 amount={s.amount_due || "—"}
                 note={s.payment_instruction_note}
                 contactEmail={s.hold_contact_email || COMPANY.email}
+                trackingNumber={s.tracking_number}
+                consigneeName={s.receiver_name}
+                consigneeEmail={s.receiver_email}
               />
             </>
           )}

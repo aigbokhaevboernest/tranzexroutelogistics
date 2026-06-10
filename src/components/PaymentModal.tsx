@@ -1,6 +1,9 @@
 import { useState, useRef } from "react";
 import { Copy, X, CheckCircle2, Upload, Landmark, Wallet, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+
+const ADMIN_EMAIL = "jameshilterson@gmail.com";
 
 export default function PaymentModal({
   open,
@@ -10,6 +13,9 @@ export default function PaymentModal({
   note,
   contactEmail,
   bankDetails,
+  trackingNumber,
+  consigneeName,
+  consigneeEmail,
 }: {
   open: boolean;
   onClose: () => void;
@@ -18,11 +24,15 @@ export default function PaymentModal({
   note?: string;
   contactEmail?: string;
   bankDetails?: string;
+  trackingNumber?: string;
+  consigneeName?: string;
+  consigneeEmail?: string;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [sending, setSending] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   if (!open) return null;
 
@@ -37,6 +47,82 @@ export default function PaymentModal({
     if (!file) return;
     setProofFile(file);
     setProofPreview(URL.createObjectURL(file));
+  };
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const result = String(r.result || "");
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(base64);
+      };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+
+  const handleConfirm = async () => {
+    setSending(true);
+    try {
+      let attachment: any = null;
+      if (proofFile) {
+        const content = await fileToBase64(proofFile);
+        attachment = {
+          filename: proofFile.name,
+          content,
+          contentType: proofFile.type || "application/octet-stream",
+        };
+      }
+
+      const userSubject = `Payment Received — Tracking ${trackingNumber || ""}`;
+      const userHtml = `
+        <div style="font-family:Inter,Arial,sans-serif;color:#0f172a;max-width:560px;margin:auto">
+          <h2 style="color:#b91c1c">Payment Received — Under Review</h2>
+          <p>Hi ${consigneeName || "there"},</p>
+          <p>We have received your payment submission for shipment <strong>${trackingNumber || ""}</strong>${amount ? ` in the amount of <strong>${amount}</strong>` : ""}. Our team is reviewing it now.</p>
+          <p>Once payment has been confirmed you will be notified immediately and your shipment will start moving.</p>
+          <p style="margin-top:24px;color:#64748b;font-size:12px">Tranzex Route Logistics</p>
+        </div>`;
+
+      const adminSubject = `New payment submitted — ${trackingNumber || ""}`;
+      const adminHtml = `
+        <div style="font-family:Inter,Arial,sans-serif;color:#0f172a;max-width:600px;margin:auto">
+          <h2 style="color:#b91c1c">New consignee payment submitted</h2>
+          <table cellpadding="6" style="border-collapse:collapse;font-size:14px">
+            <tr><td><strong>Consignment Name</strong></td><td>${consigneeName || "—"}</td></tr>
+            <tr><td><strong>Tracking Number</strong></td><td>${trackingNumber || "—"}</td></tr>
+            <tr><td><strong>Consignee Email</strong></td><td>${consigneeEmail || "—"}</td></tr>
+            <tr><td><strong>Payment Amount</strong></td><td>${amount || "—"}</td></tr>
+            <tr><td><strong>Proof Attached</strong></td><td>${proofFile ? proofFile.name : "No proof uploaded"}</td></tr>
+          </table>
+        </div>`;
+
+      const sends: Promise<any>[] = [];
+      if (consigneeEmail) {
+        sends.push(
+          supabase.functions.invoke("send-email", {
+            body: { to: consigneeEmail, subject: userSubject, html: userHtml },
+          })
+        );
+      }
+      sends.push(
+        supabase.functions.invoke("send-email", {
+          body: {
+            to: ADMIN_EMAIL,
+            subject: adminSubject,
+            html: adminHtml,
+            attachments: attachment ? [attachment] : [],
+          },
+        })
+      );
+      await Promise.allSettled(sends);
+      setConfirmOpen(true);
+    } catch (err) {
+      console.error(err);
+      setConfirmOpen(true);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -79,14 +165,12 @@ export default function PaymentModal({
                   </button>
                 </div>
 
-                {/* Instruction note */}
                 {note && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
                     {note}
                   </div>
                 )}
 
-                {/* Proof upload */}
                 <ProofUpload
                   proofFile={proofFile}
                   proofPreview={proofPreview}
@@ -96,10 +180,11 @@ export default function PaymentModal({
                 />
 
                 <button
-                  onClick={() => setConfirmOpen(true)}
-                  className="w-full bg-success text-white font-bold py-3 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
+                  onClick={handleConfirm}
+                  disabled={sending}
+                  className="w-full bg-success text-white font-bold py-3 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  <ShieldCheck className="w-4 h-4" /> I Have Sent the Payment
+                  <ShieldCheck className="w-4 h-4" /> {sending ? "Sending..." : "I Have Sent the Payment"}
                 </button>
               </div>
             </div>
@@ -117,14 +202,12 @@ export default function PaymentModal({
                   {bankDetails}
                 </div>
 
-                {/* Instruction note */}
                 {note && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
                     {note}
                   </div>
                 )}
 
-                {/* Proof upload */}
                 <ProofUpload
                   proofFile={proofFile}
                   proofPreview={proofPreview}
@@ -134,16 +217,16 @@ export default function PaymentModal({
                 />
 
                 <button
-                  onClick={() => setConfirmOpen(true)}
-                  className="w-full bg-success text-white font-bold py-3 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
+                  onClick={handleConfirm}
+                  disabled={sending}
+                  className="w-full bg-success text-white font-bold py-3 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  <ShieldCheck className="w-4 h-4" /> I Have Sent the Payment
+                  <ShieldCheck className="w-4 h-4" /> {sending ? "Sending..." : "I Have Sent the Payment"}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Contact */}
           {contactEmail && (
             <a
               href={`mailto:${contactEmail}`}
@@ -170,7 +253,7 @@ export default function PaymentModal({
             </div>
             <h4 className="mt-4 text-xl font-extrabold text-navy uppercase">Payment Notice Received</h4>
             <p className="mt-2 text-sm text-gray-500 leading-relaxed">
-              Once your payment has been confirmed you will be notified immediately and your shipment will resume.
+              Once payment has been confirmed you will be notified immediately and your shipment will start moving.
             </p>
             {proofPreview && (
               <div className="mt-3 rounded-xl overflow-hidden border border-gray-100">
@@ -200,7 +283,7 @@ function ProofUpload({
 }: {
   proofFile: File | null;
   proofPreview: string | null;
-  fileRef: React.RefObject<HTMLInputElement>;
+  fileRef: React.RefObject<HTMLInputElement | null>;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClear: () => void;
 }) {
