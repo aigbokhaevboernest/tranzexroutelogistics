@@ -456,6 +456,9 @@ export default function TrackingPage() {
                 amount={s.amount_due || "—"}
                 note={s.payment_instruction_note}
                 contactEmail={s.hold_contact_email || COMPANY.email}
+                trackingNumber={s.tracking_number}
+                consigneeName={s.receiver_name}
+                consigneeEmail={s.receiver_email}
               />
             </>
           )}
