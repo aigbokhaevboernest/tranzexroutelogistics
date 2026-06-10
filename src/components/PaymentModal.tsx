@@ -105,16 +105,31 @@ export default function PaymentModal({
           })
         );
       }
-      sends.push(
-        supabase.functions.invoke("sende-mail", {
-          body: {
-            to: ADMIN_EMAIL,
-            subject: adminSubject,
-            html: adminHtml,
-            attachments: attachment ? [attachment] : [],
-          },
-        })
-      );
+      // User email
+sends.push(
+  supabase.functions.invoke("sende-mail", {
+    body: {
+      to: consigneeEmail,
+      subject: userSubject,
+      first_name: consigneeName?.split(" ")[0] ?? "",
+      html_body: userHtml,
+    },
+  })
+);
+
+// Admin email
+sends.push(
+  supabase.functions.invoke("sende-mail", {
+    body: {
+      to: ADMIN_EMAIL,
+      subject: adminSubject,
+      first_name: "Admin",
+      html_body: adminHtml,
+      attachments: attachment ? [attachment] : [],
+    },
+  })
+);
+
       await Promise.allSettled(sends);
       setConfirmOpen(true);
     } catch (err) {
