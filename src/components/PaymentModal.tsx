@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_EMAIL = "jameshilterson@gmail.com";
+const STORAGE_BUCKET = "payment-proofs"; // ← create this bucket in Supabase Storage
 
 export default function PaymentModal({
   open,
@@ -49,86 +50,115 @@ export default function PaymentModal({
     setProofPreview(URL.createObjectURL(file));
   };
 
-  const fileToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => {
-        const result = String(r.result || "");
-        const base64 = result.includes(",") ? result.split(",")[1] : result;
-        resolve(base64);
-      };
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
+  /** Upload to Supabase Storage → save URL to shipments table → return public URL */
+  const uploadProofAndSaveUrl = async (file: File): Promise<string | null> => {
+    try {
+      const ext = file.name.split(".").pop() ?? "png";
+      const path = `${trackingNumber ?? "unknown"}_${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(path, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        return null;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from(STORAGE_BUCKET)
+        .getPublicUrl(path);
+
+      const publicUrl = urlData?.publicUrl ?? null;
+
+      if (publicUrl && trackingNumber) {
+        const { error: dbError } = await supabase
+          .from("shipments")
+          .update({ proof_of_payment_url: publicUrl })
+          .eq("tracking_number", trackingNumber);
+
+        if (dbError) console.error("DB update error:", dbError);
+      }
+
+      return publicUrl;
+    } catch (err) {
+      console.error("uploadProofAndSaveUrl error:", err);
+      return null;
+    }
+  };
 
   const handleConfirm = async () => {
     setSending(true);
     try {
-      let attachment: any = null;
+      // Upload proof image and get public URL
+      let proofPublicUrl: string | null = null;
       if (proofFile) {
-        const content = await fileToBase64(proofFile);
-        attachment = {
-          filename: proofFile.name,
-          content,
-          contentType: proofFile.type || "application/octet-stream",
-        };
+        proofPublicUrl = await uploadProofAndSaveUrl(proofFile);
       }
 
-      const userSubject = `Payment Received — Tracking ${trackingNumber || ""}`;
+      const userSubject = `Payment Received — Tracking ${trackingNumber ?? ""}`;
       const userHtml = `
         <div style="font-family:Inter,Arial,sans-serif;color:#0f172a;max-width:560px;margin:auto">
           <h2 style="color:#b91c1c">Payment Received — Under Review</h2>
-          <p>Hi ${consigneeName || "there"},</p>
-          <p>We have received your payment submission for shipment <strong>${trackingNumber || ""}</strong>${amount ? ` in the amount of <strong>${amount}</strong>` : ""}. Our team is reviewing it now.</p>
+          <p>Hi ${consigneeName ?? "there"},</p>
+          <p>We have received your payment submission for shipment <strong>${trackingNumber ?? ""}</strong>${amount ? ` in the amount of <strong>${amount}</strong>` : ""}. Our team is reviewing it now.</p>
           <p>Once payment has been confirmed you will be notified immediately and your shipment will start moving.</p>
           <p style="margin-top:24px;color:#64748b;font-size:12px">Tranzex Route Logistics</p>
         </div>`;
 
-      const adminSubject = `New payment submitted — ${trackingNumber || ""}`;
       const adminHtml = `
         <div style="font-family:Inter,Arial,sans-serif;color:#0f172a;max-width:600px;margin:auto">
           <h2 style="color:#b91c1c">New consignee payment submitted</h2>
           <table cellpadding="6" style="border-collapse:collapse;font-size:14px">
-            <tr><td><strong>Consignment Name</strong></td><td>${consigneeName || "—"}</td></tr>
-            <tr><td><strong>Tracking Number</strong></td><td>${trackingNumber || "—"}</td></tr>
-            <tr><td><strong>Consignee Email</strong></td><td>${consigneeEmail || "—"}</td></tr>
-            <tr><td><strong>Payment Amount</strong></td><td>${amount || "—"}</td></tr>
-            <tr><td><strong>Proof Attached</strong></td><td>${proofFile ? proofFile.name : "No proof uploaded"}</td></tr>
+            <tr><td><strong>Consignment Name</strong></td><td>${consigneeName ?? "—"}</td></tr>
+            <tr><td><strong>Tracking Number</strong></td><td>${trackingNumber ?? "—"}</td></tr>
+            <tr><td><strong>Consignee Email</strong></td><td>${consigneeEmail ?? "—"}</td></tr>
+            <tr><td><strong>Payment Amount</strong></td><td>${amount ?? "—"}</td></tr>
+            <tr><td><strong>Proof of Payment</strong></td><td>
+              ${
+                proofPublicUrl
+                  ? `<a href="${proofPublicUrl}" style="color:#b91c1c;font-weight:bold" target="_blank">View Proof Image →</a>`
+                  : "No proof uploaded"
+              }
+            </td></tr>
           </table>
+          ${
+            proofPublicUrl
+              ? `<div style="margin-top:16px">
+                  <img src="${proofPublicUrl}" alt="Proof of payment" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0" />
+                 </div>`
+              : ""
+          }
         </div>`;
 
+      const adminSubject = `New payment submitted — ${trackingNumber ?? ""}`;
+
       const sends: Promise<any>[] = [];
+
       if (consigneeEmail) {
         sends.push(
           supabase.functions.invoke("sende-mail", {
-            body: { to: consigneeEmail, subject: userSubject, html: userHtml },
+            body: {
+              to: consigneeEmail,
+              subject: userSubject,
+              first_name: consigneeName?.split(" ")[0] ?? "",
+              html_body: userHtml,
+            },
           })
         );
       }
-      // User email
-sends.push(
-  supabase.functions.invoke("sende-mail", {
-    body: {
-      to: consigneeEmail,
-      subject: userSubject,
-      first_name: consigneeName?.split(" ")[0] ?? "",
-      html_body: userHtml,
-    },
-  })
-);
 
-// Admin email
-sends.push(
-  supabase.functions.invoke("sende-mail", {
-    body: {
-      to: ADMIN_EMAIL,
-      subject: adminSubject,
-      first_name: "Admin",
-      html_body: adminHtml,
-      attachments: attachment ? [attachment] : [],
-    },
-  })
-);
+      sends.push(
+        supabase.functions.invoke("sende-mail", {
+          body: {
+            to: ADMIN_EMAIL,
+            subject: adminSubject,
+            first_name: "Admin",
+            html_body: adminHtml,
+            // No base64 attachment needed — image is inlined via public URL
+          },
+        })
+      );
 
       await Promise.allSettled(sends);
       setConfirmOpen(true);
@@ -179,13 +209,11 @@ sends.push(
                     <Copy className="w-3 h-3" /> Copy
                   </button>
                 </div>
-
                 {note && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
                     {note}
                   </div>
                 )}
-
                 <ProofUpload
                   proofFile={proofFile}
                   proofPreview={proofPreview}
@@ -193,7 +221,6 @@ sends.push(
                   onChange={handleFileChange}
                   onClear={() => { setProofFile(null); setProofPreview(null); }}
                 />
-
                 <button
                   onClick={handleConfirm}
                   disabled={sending}
@@ -216,13 +243,11 @@ sends.push(
                 <div className="bg-gray-50 rounded-lg p-3 text-sm text-navy whitespace-pre-wrap leading-relaxed">
                   {bankDetails}
                 </div>
-
                 {note && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
                     {note}
                   </div>
                 )}
-
                 <ProofUpload
                   proofFile={proofFile}
                   proofPreview={proofPreview}
@@ -230,7 +255,6 @@ sends.push(
                   onChange={handleFileChange}
                   onClear={() => { setProofFile(null); setProofPreview(null); }}
                 />
-
                 <button
                   onClick={handleConfirm}
                   disabled={sending}
