@@ -434,13 +434,6 @@ export default function TrackingPage() {
                 <LeafletMap origin={origin} current={current} destination={destination} />
               </div>
 
-              {/* 7. PROOF OF DELIVERY */}
-              {delivered && s.proof_of_delivery_url && (
-                <div className="bg-white rounded-md p-6 border border-border">
-                  <SectionTitle>Proof of Delivery</SectionTitle>
-                  <img src={s.proof_of_delivery_url} alt="proof" className="w-full max-w-md rounded-md border border-border" />
-                </div>
-              )}
 
               <div className="text-xs text-muted-foreground text-right">
                 Last updated: {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
