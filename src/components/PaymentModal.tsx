@@ -100,13 +100,13 @@ export default function PaymentModal({
       const sends: Promise<any>[] = [];
       if (consigneeEmail) {
         sends.push(
-          supabase.functions.invoke("send-email", {
+          supabase.functions.invoke("sende-mail", {
             body: { to: consigneeEmail, subject: userSubject, html: userHtml },
           })
         );
       }
       sends.push(
-        supabase.functions.invoke("send-email", {
+        supabase.functions.invoke("sende-mail", {
           body: {
             to: ADMIN_EMAIL,
             subject: adminSubject,
