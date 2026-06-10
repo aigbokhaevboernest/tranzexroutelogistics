@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
-import { Truck, Facebook, Instagram, Twitter, Youtube } from "lucide-react";
+import { Facebook, Instagram, Twitter, Youtube } from "lucide-react";
+
+const LOGO_URL =
+  "https://nzideivdechbxhepmlvz.supabase.co/storage/v1/object/public/shipment-assets/Tranzexroute.PNG";
 
 export default function Footer() {
   return (
