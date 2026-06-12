@@ -18,11 +18,24 @@ export default function ShipmentHistory({ history }: { history?: HistoryItem[] }
     return <div className="text-muted-foreground text-sm">No history yet.</div>;
   }
 
-  const sorted = [...history].sort((a, b) => {
-    const ta = a.date ? new Date(a.date).getTime() : 0;
-    const tb = b.date ? new Date(b.date).getTime() : 0;
-    return tb - ta;
-  });
+  const parseDate = (d?: string) => {
+    if (!d) return 0;
+    const t = new Date(d).getTime();
+    if (!isNaN(t)) return t;
+    // fallback: try Date.parse with normalized separators
+    const t2 = Date.parse(String(d).replace(/-/g, "/"));
+    return isNaN(t2) ? 0 : t2;
+  };
+  const fmtDate = (d?: string) => {
+    if (!d) return "";
+    const t = parseDate(d);
+    if (!t) return d;
+    return new Date(t).toLocaleString(undefined, {
+      year: "numeric", month: "short", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
+  };
+  const sorted = [...history].sort((a, b) => parseDate(b.date) - parseDate(a.date));
 
   const LIMIT = 3;
   const showAll = expanded || sorted.length <= LIMIT;

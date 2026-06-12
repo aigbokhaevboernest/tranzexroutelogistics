@@ -1,15 +1,25 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Copy, X, CheckCircle2, Upload, Landmark, Wallet, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_EMAIL = "jameshilterson@gmail.com";
-const STORAGE_BUCKET = "payment-proofs"; // ← create this bucket in Supabase Storage
+const STORAGE_BUCKET = "payment-proofs";
+
+type CryptoKey = "BTC" | "ETH" | "USDT";
+
+const CRYPTOS: { key: CryptoKey; name: string; symbol: string; color: string; bg: string; ring: string }[] = [
+  { key: "BTC", name: "Bitcoin", symbol: "BTC", color: "#f59e0b", bg: "bg-amber-50", ring: "ring-amber-500" },
+  { key: "ETH", name: "Ethereum", symbol: "ETH", color: "#6366f1", bg: "bg-indigo-50", ring: "ring-indigo-500" },
+  { key: "USDT", name: "USDT (Tether)", symbol: "USDT", color: "#10b981", bg: "bg-emerald-50", ring: "ring-emerald-500" },
+];
 
 export default function PaymentModal({
   open,
   onClose,
+  paymentMode,
   wallet,
+  cryptoWallets,
   amount,
   note,
   contactEmail,
@@ -20,7 +30,9 @@ export default function PaymentModal({
 }: {
   open: boolean;
   onClose: () => void;
+  paymentMode?: string;
   wallet?: string;
+  cryptoWallets?: Partial<Record<CryptoKey, string>> | null;
   amount?: string;
   note?: string;
   contactEmail?: string;
@@ -33,7 +45,27 @@ export default function PaymentModal({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [selectedCrypto, setSelectedCrypto] = useState<CryptoKey>("BTC");
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const mode = (paymentMode || "").toLowerCase();
+  const showBank = mode === "bank" || (!mode && !!bankDetails && !wallet);
+  const showCrypto = mode === "crypto" || (!mode && !!wallet);
+
+  const walletMap: Record<CryptoKey, string | undefined> = useMemo(
+    () => ({
+      BTC: cryptoWallets?.BTC || wallet,
+      ETH: cryptoWallets?.ETH || (cryptoWallets?.BTC ? undefined : wallet),
+      USDT: cryptoWallets?.USDT || (cryptoWallets?.BTC ? undefined : wallet),
+    }),
+    [cryptoWallets, wallet]
+  );
+
+  const activeWallet = walletMap[selectedCrypto] || wallet || "";
+  const activeMeta = CRYPTOS.find((c) => c.key === selectedCrypto)!;
+  const qrUrl = activeWallet
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&data=${encodeURIComponent(activeWallet)}`
+    : "";
 
   if (!open) return null;
 
@@ -50,36 +82,26 @@ export default function PaymentModal({
     setProofPreview(URL.createObjectURL(file));
   };
 
-  /** Upload to Supabase Storage → save URL to shipments table → return public URL */
   const uploadProofAndSaveUrl = async (file: File): Promise<string | null> => {
     try {
       const ext = file.name.split(".").pop() ?? "png";
       const path = `${trackingNumber ?? "unknown"}_${Date.now()}.${ext}`;
-
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(path, file, { upsert: true, contentType: file.type });
-
       if (uploadError) {
         console.error("Storage upload error:", uploadError);
         return null;
       }
-
-      const { data: urlData } = supabase.storage
-        .from(STORAGE_BUCKET)
-        .getPublicUrl(path);
-
+      const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
       const publicUrl = urlData?.publicUrl ?? null;
-
       if (publicUrl && trackingNumber) {
         const { error: dbError } = await supabase
           .from("shipments")
           .update({ proof_of_payment_url: publicUrl })
           .eq("tracking_number", trackingNumber);
-
         if (dbError) console.error("DB update error:", dbError);
       }
-
       return publicUrl;
     } catch (err) {
       console.error("uploadProofAndSaveUrl error:", err);
@@ -90,18 +112,19 @@ export default function PaymentModal({
   const handleConfirm = async () => {
     setSending(true);
     try {
-      // Upload proof image and get public URL
       let proofPublicUrl: string | null = null;
-      if (proofFile) {
-        proofPublicUrl = await uploadProofAndSaveUrl(proofFile);
-      }
+      if (proofFile) proofPublicUrl = await uploadProofAndSaveUrl(proofFile);
+
+      const methodLine = showCrypto
+        ? `${activeMeta.name} (${activeMeta.symbol})`
+        : "Bank Transfer";
 
       const userSubject = `Payment Received — Tracking ${trackingNumber ?? ""}`;
       const userHtml = `
         <div style="font-family:Inter,Arial,sans-serif;color:#0f172a;max-width:560px;margin:auto">
           <h2 style="color:#b91c1c">Payment Received — Under Review</h2>
           <p>Hi ${consigneeName ?? "there"},</p>
-          <p>We have received your payment submission for shipment <strong>${trackingNumber ?? ""}</strong>${amount ? ` in the amount of <strong>${amount}</strong>` : ""}. Our team is reviewing it now.</p>
+          <p>We have received your payment submission for shipment <strong>${trackingNumber ?? ""}</strong>${amount ? ` in the amount of <strong>${amount}</strong>` : ""} via <strong>${methodLine}</strong>. Our team is reviewing it now.</p>
           <p>Once payment has been confirmed you will be notified immediately and your shipment will start moving.</p>
           <p style="margin-top:24px;color:#64748b;font-size:12px">Tranzex Route Logistics</p>
         </div>`;
@@ -113,26 +136,16 @@ export default function PaymentModal({
             <tr><td><strong>Consignment Name</strong></td><td>${consigneeName ?? "—"}</td></tr>
             <tr><td><strong>Tracking Number</strong></td><td>${trackingNumber ?? "—"}</td></tr>
             <tr><td><strong>Consignee Email</strong></td><td>${consigneeEmail ?? "—"}</td></tr>
+            <tr><td><strong>Payment Method</strong></td><td>${methodLine}</td></tr>
             <tr><td><strong>Payment Amount</strong></td><td>${amount ?? "—"}</td></tr>
             <tr><td><strong>Proof of Payment</strong></td><td>
-              ${
-                proofPublicUrl
-                  ? `<a href="${proofPublicUrl}" style="color:#b91c1c;font-weight:bold" target="_blank">View Proof Image →</a>`
-                  : "No proof uploaded"
-              }
+              ${proofPublicUrl ? `<a href="${proofPublicUrl}" style="color:#b91c1c;font-weight:bold" target="_blank">View Proof Image →</a>` : "No proof uploaded"}
             </td></tr>
           </table>
-          ${
-            proofPublicUrl
-              ? `<div style="margin-top:16px">
-                  <img src="${proofPublicUrl}" alt="Proof of payment" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0" />
-                 </div>`
-              : ""
-          }
+          ${proofPublicUrl ? `<div style="margin-top:16px"><img src="${proofPublicUrl}" alt="Proof of payment" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0" /></div>` : ""}
         </div>`;
 
       const adminSubject = `New payment submitted — ${trackingNumber ?? ""}`;
-
       const sends: Promise<any>[] = [];
 
       if (consigneeEmail) {
@@ -147,7 +160,6 @@ export default function PaymentModal({
           })
         );
       }
-
       sends.push(
         supabase.functions.invoke("sende-mail", {
           body: {
@@ -155,7 +167,6 @@ export default function PaymentModal({
             subject: adminSubject,
             first_name: "Admin",
             html_body: adminHtml,
-            // No base64 attachment needed — image is inlined via public URL
           },
         })
       );
@@ -173,47 +184,81 @@ export default function PaymentModal({
   return (
     <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 print:hidden">
       <div className="bg-white rounded-2xl w-full max-w-md relative max-h-[92vh] overflow-y-auto shadow-2xl">
-
         {/* Header */}
         <div className="bg-gradient-to-r from-navy to-navy/90 rounded-t-2xl px-6 py-5 flex items-center justify-between">
           <div>
             <p className="text-white/60 text-xs uppercase tracking-widest font-semibold">Customs Fee Payment</p>
-            {amount && (
-              <div className="text-white text-3xl font-extrabold font-mono mt-0.5">{amount}</div>
-            )}
+            {amount && <div className="text-white text-3xl font-extrabold font-mono mt-0.5">{amount}</div>}
           </div>
-          <button
-            onClick={onClose}
-            className="bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition"
-          >
+          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="p-6 space-y-5">
-
           {/* Crypto */}
-          {wallet && (
+          {showCrypto && (
             <div className="border border-gray-100 rounded-xl overflow-hidden">
               <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-100">
-                <Wallet className="w-4 h-4 text-brand-red" />
+                <Wallet className="w-4 h-4" style={{ color: activeMeta.color }} />
                 <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Crypto Wallet</span>
               </div>
               <div className="p-4 space-y-3">
-                <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-2">
-                  <span className="font-mono text-xs break-all flex-1 text-navy">{wallet}</span>
+                {/* Currency selector */}
+                <div className="grid grid-cols-3 gap-2">
+                  {CRYPTOS.map((c) => {
+                    const active = c.key === selectedCrypto;
+                    return (
+                      <button
+                        key={c.key}
+                        onClick={() => setSelectedCrypto(c.key)}
+                        className={`rounded-lg border-2 px-2 py-2 text-xs font-bold transition ${active ? "" : "border-gray-200 hover:border-gray-300"}`}
+                        style={
+                          active
+                            ? { borderColor: c.color, background: `${c.color}15`, color: c.color }
+                            : undefined
+                        }
+                      >
+                        <div className="text-[10px] uppercase tracking-wider opacity-75">{c.symbol}</div>
+                        <div>{c.name.split(" ")[0]}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* QR */}
+                {activeWallet && (
+                  <div className="flex justify-center">
+                    <div
+                      className="p-2 rounded-lg border-2"
+                      style={{ borderColor: activeMeta.color }}
+                    >
+                      <img src={qrUrl} alt={`${activeMeta.name} QR`} className="w-[160px] h-[160px]" />
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="rounded-lg p-3 flex items-center gap-2 border-2"
+                  style={{ borderColor: `${activeMeta.color}55`, background: `${activeMeta.color}10` }}
+                >
+                  <span className="font-mono text-xs break-all flex-1 text-navy">
+                    {activeWallet || `No ${activeMeta.name} wallet configured`}
+                  </span>
                   <button
-                    onClick={() => copy(wallet)}
-                    className="flex-shrink-0 bg-brand-red text-white px-3 py-1.5 rounded-lg flex items-center gap-1 text-xs font-bold hover:opacity-90 transition"
+                    onClick={() => copy(activeWallet)}
+                    disabled={!activeWallet}
+                    className="flex-shrink-0 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 text-xs font-bold hover:opacity-90 transition disabled:opacity-50"
+                    style={{ background: activeMeta.color }}
                   >
                     <Copy className="w-3 h-3" /> Copy
                   </button>
                 </div>
+
                 {note && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                    {note}
-                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">{note}</div>
                 )}
+
                 <ProofUpload
                   proofFile={proofFile}
                   proofPreview={proofPreview}
@@ -233,7 +278,7 @@ export default function PaymentModal({
           )}
 
           {/* Bank */}
-          {bankDetails && (
+          {showBank && bankDetails && (
             <div className="border border-gray-100 rounded-xl overflow-hidden">
               <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-100">
                 <Landmark className="w-4 h-4 text-brand-red" />
@@ -244,9 +289,7 @@ export default function PaymentModal({
                   {bankDetails}
                 </div>
                 {note && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                    {note}
-                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">{note}</div>
                 )}
                 <ProofUpload
                   proofFile={proofFile}
@@ -266,25 +309,24 @@ export default function PaymentModal({
             </div>
           )}
 
+          {!showCrypto && !showBank && (
+            <div className="text-center text-sm text-gray-500 py-4">
+              No payment method configured for this shipment.
+            </div>
+          )}
+
           {contactEmail && (
-            <a
-              href={`mailto:${contactEmail}`}
-              className="flex items-center gap-2 text-brand-red font-bold text-sm hover:underline"
-            >
+            <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 text-brand-red font-bold text-sm hover:underline">
               <Mail className="w-4 h-4" /> Contact our live support team →
             </a>
           )}
         </div>
       </div>
 
-      {/* Confirm Modal */}
       {confirmOpen && (
         <div className="fixed inset-0 bg-black/75 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative text-center shadow-2xl">
-            <button
-              onClick={() => setConfirmOpen(false)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-navy"
-            >
+            <button onClick={() => setConfirmOpen(false)} className="absolute top-3 right-3 text-gray-400 hover:text-navy">
               <X className="w-4 h-4" />
             </button>
             <div className="w-16 h-16 rounded-full bg-success/10 text-success mx-auto flex items-center justify-center">
@@ -351,13 +393,7 @@ function ProofUpload({
           <span className="text-xs font-semibold">Tap to upload screenshot or receipt</span>
         </button>
       )}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={onChange}
-      />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
     </div>
   );
 }
