@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Search,
-  Copy,
-  Printer,
-  CheckCircle2,
-  Undo2,
-  AlertTriangle,
+  Search, Copy, Printer, CheckCircle2, Undo2, AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
@@ -34,14 +29,8 @@ const COMPANY = {
 };
 
 const CUSTOMS_KEYWORDS = [
-  "customs",
-  "duty",
-  "duties",
-  "tax",
-  "tariff",
-  "clearance",
-  "import fee",
-  "vat",
+  "customs", "duty", "duties", "tax", "tariff",
+  "clearance", "import fee", "vat",
 ];
 
 function isCustomsComment(text?: string) {
@@ -66,9 +55,7 @@ export default function TrackingPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [printPreview, setPrintPreview] = useState(false);
 
-  useEffect(() => {
-    setQuery(urlN);
-  }, [urlN]);
+  useEffect(() => { setQuery(urlN); }, [urlN]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,11 +66,7 @@ export default function TrackingPage() {
   };
 
   useEffect(() => {
-    if (!submitted) {
-      setShipment(null);
-      setError(null);
-      return;
-    }
+    if (!submitted) { setShipment(null); setError(null); return; }
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
     let isInitial = true;
@@ -92,22 +75,31 @@ export default function TrackingPage() {
       if (isInitial) setLoading(true);
       const { data, error } = await supabase
         .from("shipments")
-        .select(
-  "id, tracking_number, status, current_location, amount_due, expected_delivery_date, date_sent, origin_label, destination_label, origin_lat, origin_lng, destination_lat, destination_lng, current_stop_lat, current_stop_lng, current_stop_label, package_type, weight, description, comments, package_image_url, show_image, sender_name, sender_phone, sender_email, sender_address, receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country, history, show_airport_step, hold_headline, hold_body, hold_note, hold_contact_email, crypto_wallet_address, crypto_wallets, bank_details, payment_instruction_note, proof_of_delivery_url, updated_at, payment_mode, transport_mode"
-)
+        .select(`
+          id, tracking_number, status, current_location, amount_due,
+          expected_delivery_date, date_sent, origin_label, destination_label,
+          origin_lat, origin_lng, destination_lat, destination_lng,
+          current_stop_lat, current_stop_lng, current_stop_label,
+          package_type, weight, description, comments,
+          package_image_url, show_image,
+          sender_name, sender_phone, sender_email, sender_address,
+          receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country,
+          history, show_airport_step,
+          hold_headline, hold_body, hold_footer_note, hold_contact_email, hold_note,
+          crypto_wallet_address, crypto_wallets,
+          bank_name, bank_account_number, bank_account_name, bank_details,
+          payment_instruction_note, bank_instruction_note,
+          proof_of_delivery_url, updated_at,
+          payment_mode, transport_mode, crypto_currency
+        `)
         .eq("tracking_number", submitted)
         .maybeSingle();
+
       if (cancelled) return;
       if (error) {
-        if (isInitial) {
-          setError(error.message);
-          setShipment(null);
-        }
+        if (isInitial) { setError(error.message); setShipment(null); }
       } else if (!data) {
-        if (isInitial) {
-          setError("No shipment found for this tracking number");
-          setShipment(null);
-        }
+        if (isInitial) { setError("No shipment found for this tracking number"); setShipment(null); }
       } else {
         setError(null);
         setShipment((prev: any) => {
@@ -118,6 +110,7 @@ export default function TrackingPage() {
       if (isInitial) setLoading(false);
       isInitial = false;
     };
+
     fetchOne();
 
     const channel = supabase
@@ -125,10 +118,7 @@ export default function TrackingPage() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "shipments", filter: "tracking_number=eq." + submitted },
-        (payload) => {
-          setShipment(payload.new);
-          toast.success("Tracking updated just now");
-        }
+        (payload) => { setShipment(payload.new); toast.success("Tracking updated just now"); }
       )
       .subscribe();
 
@@ -143,7 +133,7 @@ export default function TrackingPage() {
 
   const s = shipment;
   const onHold = s?.status === "On Hold";
-  const failed = s?.status === "FAILED" || s?.status === "Returned To Warehouse";
+  const failed = s?.status === "FAILED" || s?.status === "Returned To Warehouse" || s?.status === "Returned To Origin";
   const delivered = s?.status === "Delivered";
   const commentHighlight = useMemo(() => isCustomsComment(s?.comments), [s?.comments]);
 
@@ -159,6 +149,13 @@ export default function TrackingPage() {
     s?.destination_lat != null && s?.destination_lng != null
       ? { lat: Number(s.destination_lat), lng: Number(s.destination_lng), label: s.destination_label || "Destination" }
       : null;
+
+  // Build bank details string for PaymentModal from individual columns
+  const bankDetailsForModal = s ? [
+    s.bank_name,
+    s.bank_account_name,
+    s.bank_account_number,
+  ].filter(Boolean).join(" · ") || s.bank_details || null : null;
 
   return (
     <>
@@ -218,7 +215,9 @@ export default function TrackingPage() {
                   <div className="mt-3 text-mono text-xl font-extrabold">
                     Amount Due: {s.amount_due || "—"}
                   </div>
-                  {s.hold_note && <p className="mt-2 italic text-white/85 text-sm">{s.hold_note}</p>}
+                  {s.hold_footer_note && (
+                    <p className="mt-2 italic text-white/85 text-sm">{s.hold_footer_note}</p>
+                  )}
                   <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       onClick={() => setPayOpen(true)}
@@ -236,9 +235,7 @@ export default function TrackingPage() {
                     )}
                   </div>
                 </div>
-                <button onClick={() => setDismissBanner(true)} className="text-white/80 hover:text-white" aria-label="Dismiss">
-                  ×
-                </button>
+                <button onClick={() => setDismissBanner(true)} className="text-white/80 hover:text-white" aria-label="Dismiss">×</button>
               </div>
             </div>
           )}
@@ -248,7 +245,7 @@ export default function TrackingPage() {
               <Undo2 className="w-8 h-8 animate-return-arrow shrink-0" />
               <div>
                 <div className="font-extrabold text-display text-xl uppercase">
-                  Shipment Failed — This package has been returned to the warehouse
+                  Shipment Failed — This package has been returned
                 </div>
               </div>
             </div>
@@ -264,10 +261,7 @@ export default function TrackingPage() {
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-mono text-2xl md:text-3xl font-extrabold text-navy">{s.tracking_number}</span>
                       <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(s.tracking_number);
-                          toast.success("Copied!");
-                        }}
+                        onClick={() => { navigator.clipboard.writeText(s.tracking_number); toast.success("Copied!"); }}
                         className="text-muted-foreground hover:text-brand-red"
                         aria-label="Copy"
                       >
@@ -292,15 +286,16 @@ export default function TrackingPage() {
                   </div>
                 ) : (
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <BoldChip label="Status" value={s.status} color={getStepColor(s.status, s.transport_mode)} valueClass="font-extrabold" valueStyle={{ color: getStepColor(s.status, s.transport_mode) }} />
+                    <BoldChip
+                      label="Status"
+                      value={s.status}
+                      color={getStepColor(s.status, s.transport_mode)}
+                      valueClass="font-extrabold"
+                      valueStyle={{ color: getStepColor(s.status, s.transport_mode) }}
+                    />
                     <BoldChip
                       label="Current Location"
-                      value={
-                        <span>
-                          {s.current_location_flag ? `${s.current_location_flag} ` : ""}
-                          {s.current_location || "—"}
-                        </span>
-                      }
+                      value={s.current_location || "—"}
                     />
                     <BoldChip
                       label="Amount Due"
@@ -327,30 +322,26 @@ export default function TrackingPage() {
                     </div>
                   </div>
                 )}
-              </div>{/* ← this closing </div> was missing */}
+              </div>
 
-              {/* 1. SHIPMENT DETAILS */}
+              {/* Shipment Details */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipment Details</SectionTitle>
-{(() => {
-  const imgSrc = delivered && s.proof_of_delivery_url ? s.proof_of_delivery_url : s.package_image_url;
-  const showImg = delivered ? !!s.proof_of_delivery_url : (s.package_image_url && s.show_image);
-  if (!showImg) return null;
-  return (
-    <div className="w-full bg-secondary rounded-md overflow-hidden border border-border flex flex-col items-center justify-center">
-      <img
-        src={imgSrc}
-        alt={delivered ? "proof of delivery" : "package"}
-        className="w-full max-h-[420px] object-contain"
-      />
-      {delivered && (
-        <div className="w-full text-center text-xs uppercase tracking-widest font-bold text-success py-2 bg-success/10 border-t border-border">
-          Proof of Delivery
-        </div>
-      )}
-    </div>
-  );
-})()}
+                {(() => {
+                  const imgSrc = delivered && s.proof_of_delivery_url ? s.proof_of_delivery_url : s.package_image_url;
+                  const showImg = delivered ? !!s.proof_of_delivery_url : (s.package_image_url && s.show_image);
+                  if (!showImg) return null;
+                  return (
+                    <div className="w-full bg-secondary rounded-md overflow-hidden border border-border flex flex-col items-center justify-center">
+                      <img src={imgSrc} alt={delivered ? "proof of delivery" : "package"} className="w-full max-h-[420px] object-contain" />
+                      {delivered && (
+                        <div className="w-full text-center text-xs uppercase tracking-widest font-bold text-success py-2 bg-success/10 border-t border-border">
+                          Proof of Delivery
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                   <Row label="Origin" value={s.origin_label} />
@@ -359,9 +350,7 @@ export default function TrackingPage() {
                   <Row label="Weight" value={s.weight} />
                   <Row label="Date Sent" value={s.date_sent} />
                   <Row label="Expected Delivery" value={s.expected_delivery_date ? new Date(s.expected_delivery_date).toLocaleDateString() : "—"} />
-                  <div className="sm:col-span-2">
-                    <Row label="Description" value={s.description} />
-                  </div>
+                  <div className="sm:col-span-2"><Row label="Description" value={s.description} /></div>
                   <div className="sm:col-span-2 grid grid-cols-[140px_1fr] gap-3 py-2 border-b border-border text-sm items-center">
                     <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider">Status</div>
                     <div>
@@ -376,13 +365,11 @@ export default function TrackingPage() {
                   {s.comments && (
                     <div className="sm:col-span-2 mt-3">
                       <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider mb-1">Comments</div>
-                      <div
-                        className={
-                          commentHighlight
-                            ? "bg-warning/25 border-l-4 border-warning rounded p-3 text-navy text-sm font-medium"
-                            : "bg-secondary border border-border rounded p-3 text-navy text-sm"
-                        }
-                      >
+                      <div className={
+                        commentHighlight
+                          ? "bg-warning/25 border-l-4 border-warning rounded p-3 text-navy text-sm font-medium"
+                          : "bg-secondary border border-border rounded p-3 text-navy text-sm"
+                      }>
                         {s.comments}
                       </div>
                     </div>
@@ -390,10 +377,10 @@ export default function TrackingPage() {
                 </div>
               </div>
 
-              {/* Status Chart (progress stepper) */}
+              {/* Stepper */}
               <Stepper status={s.status} transportMode={s.transport_mode} />
 
-              {/* 3. SHIPPER INFORMATION */}
+              {/* Shipper */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipper Information</SectionTitle>
                 <PartyCard
@@ -405,7 +392,7 @@ export default function TrackingPage() {
                 />
               </div>
 
-              {/* 4. CONSIGNEE INFORMATION */}
+              {/* Consignee */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Consignee Information</SectionTitle>
                 <PartyCard
@@ -418,13 +405,13 @@ export default function TrackingPage() {
                 />
               </div>
 
-              {/* 5. SHIPMENT HISTORY */}
+              {/* History */}
               <div className="bg-white rounded-md p-6 border border-border">
                 <SectionTitle>Shipment History</SectionTitle>
                 <ShipmentHistory history={s.history} />
               </div>
 
-              {/* MAP */}
+              {/* Map */}
               <div className="bg-white rounded-md border border-border overflow-hidden">
                 <MapInfoBar
                   origin={s.origin_label}
@@ -443,7 +430,6 @@ export default function TrackingPage() {
                 />
               </div>
 
-
               <div className="text-xs text-muted-foreground text-right">
                 Last updated: {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
               </div>
@@ -454,9 +440,14 @@ export default function TrackingPage() {
                 open={payOpen}
                 onClose={() => setPayOpen(false)}
                 paymentMode={s.payment_mode}
+                cryptoCurrency={s.crypto_currency}
                 wallet={s.crypto_wallet_address}
                 cryptoWallets={s.crypto_wallets}
-                bankDetails={s.bank_details}
+                bankDetails={bankDetailsForModal}
+                bankName={s.bank_name}
+                bankAccountNumber={s.bank_account_number}
+                bankAccountName={s.bank_account_name}
+                bankInstructionNote={s.bank_instruction_note}
                 amount={s.amount_due || "—"}
                 note={s.payment_instruction_note}
                 contactEmail={s.hold_contact_email || COMPANY.email}
