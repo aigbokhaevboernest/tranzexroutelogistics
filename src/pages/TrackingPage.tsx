@@ -93,7 +93,7 @@ export default function TrackingPage() {
       const { data, error } = await supabase
         .from("shipments")
         .select(
-  "id, tracking_number, status, current_location, current_location_flag, amount_due, expected_delivery_date, date_sent, origin_label, destination_label, origin_lat, origin_lng, destination_lat, destination_lng, current_stop_lat, current_stop_lng, current_stop_label, package_type, weight, description, comments, package_image_url, show_image, sender_name, sender_phone, sender_email, sender_address, receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country, history, show_airport_step, hold_headline, hold_body, hold_note, hold_contact_email, crypto_wallet_address, crypto_wallets, bank_details, payment_instruction_note, proof_of_delivery_url, updated_at, payment_mode, transport_mode"
+  "id, tracking_number, status, current_location, amount_due, expected_delivery_date, date_sent, origin_label, destination_label, origin_lat, origin_lng, destination_lat, destination_lng, current_stop_lat, current_stop_lng, current_stop_label, package_type, weight, description, comments, package_image_url, show_image, sender_name, sender_phone, sender_email, sender_address, receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country, history, show_airport_step, hold_headline, hold_body, hold_note, hold_contact_email, crypto_wallet_address, crypto_wallets, bank_details, payment_instruction_note, proof_of_delivery_url, updated_at, payment_mode, transport_mode"
 )
         .eq("tracking_number", submitted)
         .maybeSingle();
