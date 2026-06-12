@@ -17,7 +17,7 @@ import SectionTitle from "@/components/SectionTitle";
 import BoldChip from "@/components/BoldChip";
 import Row from "@/components/Row";
 import PartyCard from "@/components/PartyCard";
-import Stepper, { getStepColor } from "@/components/Stepper";
+import Stepper, { getStepColor, getCurrentStopIndex, getSteps } from "@/components/Stepper";
 import Countdown from "@/components/Countdown";
 import MapInfoBar from "@/components/MapInfoBar";
 import LeafletMap from "@/components/LeafletMap";
@@ -93,7 +93,7 @@ export default function TrackingPage() {
       const { data, error } = await supabase
         .from("shipments")
         .select(
-  "id, tracking_number, status, current_location, current_location_flag, amount_due, expected_delivery_date, date_sent, origin_label, destination_label, origin_lat, origin_lng, destination_lat, destination_lng, current_stop_lat, current_stop_lng, current_stop_label, package_type, weight, description, comments, package_image_url, show_image, sender_name, sender_phone, sender_email, sender_address, receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country, history, show_airport_step, hold_headline, hold_body, hold_note, hold_contact_email, crypto_wallet_address, bank_details, payment_instruction_note, proof_of_delivery_url, updated_at, payment_mode"
+  "id, tracking_number, status, current_location, current_location_flag, amount_due, expected_delivery_date, date_sent, origin_label, destination_label, origin_lat, origin_lng, destination_lat, destination_lng, current_stop_lat, current_stop_lng, current_stop_label, package_type, weight, description, comments, package_image_url, show_image, sender_name, sender_phone, sender_email, sender_address, receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country, history, show_airport_step, hold_headline, hold_body, hold_note, hold_contact_email, crypto_wallet_address, crypto_wallets, bank_details, payment_instruction_note, proof_of_delivery_url, updated_at, payment_mode, transport_mode"
 )
         .eq("tracking_number", submitted)
         .maybeSingle();
@@ -292,7 +292,7 @@ export default function TrackingPage() {
                   </div>
                 ) : (
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <BoldChip label="Status" value={s.status} color={getStepColor(s.status)} valueClass="font-extrabold" valueStyle={{ color: getStepColor(s.status) }} />
+                    <BoldChip label="Status" value={s.status} color={getStepColor(s.status, s.transport_mode)} valueClass="font-extrabold" valueStyle={{ color: getStepColor(s.status, s.transport_mode) }} />
                     <BoldChip
                       label="Current Location"
                       value={
@@ -367,7 +367,7 @@ export default function TrackingPage() {
                     <div>
                       <span
                         className="inline-block text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
-                        style={{ background: getStepColor(s.status) }}
+                        style={{ background: getStepColor(s.status, s.transport_mode) }}
                       >
                         {s.status}
                       </span>
@@ -391,7 +391,7 @@ export default function TrackingPage() {
               </div>
 
               {/* Status Chart (progress stepper) */}
-              <Stepper status={s.status} showAirport={!!s.show_airport_step} />
+              <Stepper status={s.status} transportMode={s.transport_mode} />
 
               {/* 3. SHIPPER INFORMATION */}
               <div className="bg-white rounded-md p-6 border border-border">
@@ -430,8 +430,17 @@ export default function TrackingPage() {
                   origin={s.origin_label}
                   current={s.current_stop_label || s.current_location}
                   destination={s.destination_label}
+                  transportMode={s.transport_mode}
+                  currentStopIndex={getCurrentStopIndex(s.status, s.transport_mode)}
+                  totalStops={getSteps(s.transport_mode).length}
                 />
-                <LeafletMap origin={origin} current={current} destination={destination} />
+                <LeafletMap
+                  origin={origin}
+                  current={current}
+                  destination={destination}
+                  transportMode={s.transport_mode}
+                  status={s.status}
+                />
               </div>
 
 
@@ -444,7 +453,9 @@ export default function TrackingPage() {
               <PaymentModal
                 open={payOpen}
                 onClose={() => setPayOpen(false)}
+                paymentMode={s.payment_mode}
                 wallet={s.crypto_wallet_address}
+                cryptoWallets={s.crypto_wallets}
                 bankDetails={s.bank_details}
                 amount={s.amount_due || "—"}
                 note={s.payment_instruction_note}

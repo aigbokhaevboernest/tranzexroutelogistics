@@ -1,19 +1,75 @@
-import { Warehouse, Truck, PauseOctagon, PlaneLanding, Hand, CheckCircle2 } from "lucide-react";
+import {
+  Warehouse,
+  Truck,
+  PauseOctagon,
+  PlaneLanding,
+  Plane,
+  PlaneTakeoff,
+  Ship,
+  Anchor,
+  Hand,
+  CheckCircle2,
+  XCircle,
+  Undo2,
+  Building2,
+  Sailboat,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type StepDef = { key: string; label: string; icon: LucideIcon; color: string; optional?: boolean };
+export type TransportMode = "land" | "air" | "sea";
 
-export const ALL_STEPS: StepDef[] = [
-  { key: "Origin Warehouse", label: "Origin Warehouse", icon: Warehouse, color: "oklch(0.55 0.18 245)" },
-  { key: "In-Transit", label: "In-Transit", icon: Truck, color: "oklch(0.55 0.21 27)" },
-  { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: "oklch(0.72 0.18 60)" },
-  { key: "Arrived At Nearest Airport", label: "At Nearest Airport", icon: PlaneLanding, color: "oklch(0.72 0.13 210)", optional: true },
-  { key: "Pick-Up", label: "Pick-Up", icon: Hand, color: "oklch(0.55 0.18 245)" },
-  { key: "Delivered", label: "Delivered", icon: CheckCircle2, color: "oklch(0.65 0.17 145)" },
+export type StepDef = {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  color: string;
+};
+
+const C_BLUE = "oklch(0.55 0.18 245)";
+const C_RED = "oklch(0.55 0.21 27)";
+const C_AMBER = "oklch(0.72 0.18 60)";
+const C_SKY = "oklch(0.72 0.13 210)";
+const C_GREEN = "oklch(0.65 0.17 145)";
+const C_TEAL = "oklch(0.65 0.13 200)";
+
+export const LAND_STEPS: StepDef[] = [
+  { key: "Origin Warehouse", label: "Origin Warehouse", icon: Warehouse, color: C_BLUE },
+  { key: "In-Transit", label: "In-Transit", icon: Truck, color: C_RED },
+  { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: C_AMBER },
+  { key: "Arrived At Depot", label: "Arrived At Depot", icon: Building2, color: C_SKY },
+  { key: "Pick-Up", label: "Pick-Up", icon: Hand, color: C_BLUE },
+  { key: "Delivered", label: "Delivered", icon: CheckCircle2, color: C_GREEN },
 ];
 
-const FAILED_STATUSES = ["FAILED", "Returned To Warehouse"];
+export const AIR_STEPS: StepDef[] = [
+  { key: "Origin Airport", label: "Origin Airport", icon: PlaneTakeoff, color: C_BLUE },
+  { key: "Departed", label: "Departed", icon: Plane, color: C_RED },
+  { key: "In Flight", label: "In Flight", icon: Plane, color: C_RED },
+  { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: C_AMBER },
+  { key: "Arrived At Nearest Airport", label: "Arrived At Airport", icon: PlaneLanding, color: C_SKY },
+  { key: "Pick-up", label: "Pick-Up", icon: Hand, color: C_BLUE },
+  { key: "Delivered", label: "Delivered", icon: CheckCircle2, color: C_GREEN },
+];
+
+export const SEA_STEPS: StepDef[] = [
+  { key: "Origin Port", label: "Origin Port", icon: Anchor, color: C_BLUE },
+  { key: "Departed Port", label: "Departed Port", icon: Ship, color: C_RED },
+  { key: "At Sea", label: "At Sea", icon: Sailboat, color: C_TEAL },
+  { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: C_AMBER },
+  { key: "Arrived At Destination Port", label: "Arrived At Port", icon: Anchor, color: C_SKY },
+  { key: "pick-up", label: "Pick-Up", icon: Hand, color: C_BLUE },
+  { key: "Delivered", label: "Delivered", icon: CheckCircle2, color: C_GREEN },
+];
+
+const FAILED_STATUSES = ["FAILED", "Failed", "Returned To Warehouse", "Returned To Origin"];
+
+export function getSteps(mode?: string | null): StepDef[] {
+  const m = (mode || "land").toLowerCase();
+  if (m === "air") return AIR_STEPS;
+  if (m === "sea") return SEA_STEPS;
+  return LAND_STEPS;
+}
 
 function normalize(status: string) {
   return (status || "").toLowerCase().trim();
@@ -24,30 +80,52 @@ function findActiveIdx(steps: StepDef[], status: string) {
   const idx = steps.findIndex((s) => s.key.toLowerCase() === norm);
   if (idx >= 0) return idx;
   if (norm.includes("origin")) return 0;
-  if (norm.includes("transit")) return 1;
-  if (norm.includes("hold")) return 2;
-  if (norm.includes("airport")) return steps.findIndex((s) => s.key.includes("Airport"));
-  if (norm.includes("pick")) return steps.findIndex((s) => s.key === "Pick-Up");
+  if (norm.includes("depart")) return steps.findIndex((s) => s.key.toLowerCase().includes("depart"));
+  if (norm.includes("flight") || norm.includes("sea") || norm.includes("transit")) {
+    const i = steps.findIndex((s) => /flight|sea|transit/i.test(s.key));
+    if (i >= 0) return i;
+  }
+  if (norm.includes("hold")) return steps.findIndex((s) => s.key === "On Hold");
+  if (norm.includes("depot") || norm.includes("airport") || norm.includes("port")) {
+    const i = steps.findIndex((s) => /depot|airport|port/i.test(s.key) && !/origin/i.test(s.key));
+    if (i >= 0) return i;
+  }
+  if (norm.includes("pick")) return steps.findIndex((s) => /pick/i.test(s.key));
   if (norm.includes("deliver")) return steps.length - 1;
   return 0;
 }
 
-export function getStepColor(status: string): string {
-  if (FAILED_STATUSES.includes(status)) return "oklch(0.55 0.21 27)";
+export function getStepColor(status: string, mode?: string): string {
+  if (FAILED_STATUSES.includes(status)) return C_RED;
+  const steps = getSteps(mode);
   const norm = normalize(status);
-  const found = ALL_STEPS.find((s) => s.key.toLowerCase() === norm);
+  const found = steps.find((s) => s.key.toLowerCase() === norm);
   if (found) return found.color;
-  if (norm.includes("origin")) return ALL_STEPS[0].color;
-  if (norm.includes("transit")) return ALL_STEPS[1].color;
-  if (norm.includes("hold")) return ALL_STEPS[2].color;
-  if (norm.includes("airport")) return ALL_STEPS[3].color;
-  if (norm.includes("pick")) return ALL_STEPS[4].color;
-  if (norm.includes("deliver")) return ALL_STEPS[5].color;
+  if (norm.includes("origin")) return steps[0].color;
+  if (norm.includes("hold")) return C_AMBER;
+  if (norm.includes("deliver")) return C_GREEN;
+  if (norm.includes("transit") || norm.includes("flight") || norm.includes("sea")) return C_RED;
+  if (norm.includes("depot") || norm.includes("airport") || norm.includes("port")) return C_SKY;
+  if (norm.includes("pick")) return C_BLUE;
   return "oklch(0.45 0.02 260)";
 }
 
-export default function Stepper({ status, showAirport }: { status: string; showAirport: boolean }) {
-  const steps = ALL_STEPS.filter((s) => !s.optional || showAirport);
+export function getCurrentStopIndex(status: string, mode?: string) {
+  const steps = getSteps(mode);
+  if (FAILED_STATUSES.includes(status)) return 0;
+  return Math.max(0, findActiveIdx(steps, status));
+}
+
+export default function Stepper({
+  status,
+  transportMode,
+}: {
+  status: string;
+  transportMode?: string;
+  // legacy prop, ignored
+  showAirport?: boolean;
+}) {
+  const steps = getSteps(transportMode);
   const failed = FAILED_STATUSES.includes(status);
   const activeIdx = failed ? -1 : findActiveIdx(steps, status);
 
