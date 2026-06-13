@@ -84,7 +84,7 @@ export default function TrackingPage() {
           package_image_url, show_image,
           sender_name, sender_phone, sender_email, sender_address,
           receiver_name, receiver_phone, receiver_email, receiver_address, receiver_country,
-          history, show_airport_step,
+          history,
           hold_headline, hold_body, hold_footer_note, hold_contact_email, hold_note,
           crypto_wallet_address, crypto_wallets,
           bank_name, bank_account_number, bank_account_name, bank_details,
