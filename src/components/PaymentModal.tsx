@@ -40,6 +40,11 @@ export default function PaymentModal({
   trackingNumber?: string;
   consigneeName?: string;
   consigneeEmail?: string;
+  cryptoCurrency?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
+  bankInstructionNote?: string;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);

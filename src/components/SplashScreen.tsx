@@ -115,7 +115,9 @@ export default function SplashScreen() {
           {LETTERS.map((l, i) => (
             <span
               key={i}
-              ref={(el) => (lettersRef.current[i] = el)}
+              ref={(el) => {
+                lettersRef.current[i] = el;
+              }}
               style={{
                 display: "inline-block",
                 fontSize: 52,
