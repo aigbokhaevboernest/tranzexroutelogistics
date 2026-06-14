@@ -187,7 +187,7 @@ export default function PaymentModal({
         {/* Header */}
         <div className="bg-gradient-to-r from-navy to-navy/90 rounded-t-2xl px-6 py-5 flex items-center justify-between">
           <div>
-            <p className="text-white/60 text-xs uppercase tracking-widest font-semibold">Customs Fee Payment</p>
+            <p className="text-white/60 text-xs uppercase tracking-widest font-semibold">Make Payment</p>
             {amount && <div className="text-white text-3xl font-extrabold font-mono mt-0.5">{amount}</div>}
           </div>
           <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition">
