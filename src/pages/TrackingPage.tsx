@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Search, Copy, Printer, CheckCircle2, Undo2, AlertTriangle,
+  Search, Copy, Printer, CheckCircle2, Undo2, AlertTriangle, Truck, Ship, Plane,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
@@ -38,6 +38,12 @@ function isCustomsComment(text?: string) {
   const t = text.toLowerCase();
   return CUSTOMS_KEYWORDS.some((k) => t.includes(k));
 }
+
+const TRANSPORT_MODE_META: Record<string, { label: string; icon: typeof Truck; color: string }> = {
+  air: { label: "Air Freight", icon: Plane, color: "#2563eb" },
+  sea: { label: "Sea Freight", icon: Ship, color: "#0891b2" },
+  land: { label: "Land Freight", icon: Truck, color: "#ca8a04" },
+};
 
 export default function TrackingPage() {
   useDocumentMeta(
@@ -150,7 +156,6 @@ export default function TrackingPage() {
       ? { lat: Number(s.destination_lat), lng: Number(s.destination_lng), label: s.destination_label || "Destination" }
       : null;
 
-  // Build bank details string for PaymentModal from individual columns
   const bankDetailsForModal = s ? [
     s.bank_name,
     s.bank_account_name,
@@ -268,6 +273,19 @@ export default function TrackingPage() {
                         <Copy className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {s.transport_mode && TRANSPORT_MODE_META[String(s.transport_mode).toLowerCase()] && (() => {
+                      const meta = TRANSPORT_MODE_META[String(s.transport_mode).toLowerCase()];
+                      const Icon = meta.icon;
+                      return (
+                        <div
+                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full text-xs font-bold text-white"
+                          style={{ backgroundColor: meta.color }}
+                        >
+                          <Icon className="w-3.5 h-3.5" /> {meta.label}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <button
                     onClick={() => setPrintPreview(true)}
