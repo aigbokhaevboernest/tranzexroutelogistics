@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Search, Copy, Printer, CheckCircle2, Undo2, AlertTriangle,
+  Plane, Ship, Truck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
@@ -38,6 +39,15 @@ function isCustomsComment(text?: string) {
   const t = text.toLowerCase();
   return CUSTOMS_KEYWORDS.some((k) => t.includes(k));
 }
+
+// Maps a shipment's transport_mode value to the label + icon shown on the
+// summary card. Keys are lowercase since transport_mode can come from the
+// DB with inconsistent casing.
+const TRANSPORT_META: Record<string, { label: string; icon: typeof Plane }> = {
+  air: { label: "Air Freight", icon: Plane },
+  sea: { label: "Sea Freight", icon: Ship },
+  land: { label: "Land Freight", icon: Truck },
+};
 
 export default function TrackingPage() {
   useDocumentMeta(
@@ -136,6 +146,10 @@ export default function TrackingPage() {
   const failed = s?.status === "FAILED" || s?.status === "Returned To Warehouse" || s?.status === "Returned To Origin";
   const delivered = s?.status === "Delivered";
   const commentHighlight = useMemo(() => isCustomsComment(s?.comments), [s?.comments]);
+  const transportMeta = useMemo(() => {
+    const key = (s?.transport_mode || "").toLowerCase();
+    return TRANSPORT_META[key] || null;
+  }, [s?.transport_mode]);
 
   const origin =
     s?.origin_lat != null && s?.origin_lng != null
@@ -258,7 +272,7 @@ export default function TrackingPage() {
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div>
                     <div className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Tracking Number</div>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-mono text-2xl md:text-3xl font-extrabold text-navy">{s.tracking_number}</span>
                       <button
                         onClick={() => { navigator.clipboard.writeText(s.tracking_number); toast.success("Copied!"); }}
@@ -267,6 +281,12 @@ export default function TrackingPage() {
                       >
                         <Copy className="w-4 h-4" />
                       </button>
+                      {transportMeta && (
+                        <span className="inline-flex items-center gap-1.5 bg-secondary border border-border text-navy text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full">
+                          <transportMeta.icon className="w-3.5 h-3.5" />
+                          {transportMeta.label}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button
