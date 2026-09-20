@@ -4,8 +4,6 @@ import L from "leaflet";
 type Pt = { lat: number; lng: number; label: string };
 export type TransportMode = "land" | "air" | "sea";
 
-const EMOJI: Record<string, string> = { land: "🚛", air: "✈️", sea: "🚢" };
-
 function curveBetween(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
@@ -57,6 +55,37 @@ function ensureStyles() {
     }
   `;
   document.head.appendChild(style);
+}
+
+// Direction-aware vehicle glyphs — each drawn "nose up" (pointing north /
+// 0deg) so the same rotate(${bearingDeg}deg) transform used for the marker
+// correctly points the vehicle along the route in every direction.
+function vehicleSvg(mode: TransportMode, color: string): string {
+  const common = `width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
+
+  if (mode === "air") {
+    // Simple airplane silhouette, nose pointing up.
+    return `<svg ${common}>
+      <path d="M12 1.5L13.4 8.5L21.5 11.5L13.6 12.6L14.8 21L12 18.2L9.2 21L10.4 12.6L2.5 11.5L10.6 8.5L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  if (mode === "sea") {
+    // Boat/ship silhouette, bow pointing up.
+    return `<svg ${common}>
+      <path d="M12 2L15.2 10.5H8.8L12 2Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+      <rect x="10" y="10.5" width="4" height="6" fill="${color}" stroke="white" stroke-width="0.75"/>
+      <path d="M3.5 18C6 20.3 9 21.5 12 21.5C15 21.5 18 20.3 20.5 18L18.5 15.8H5.5L3.5 18Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  // land — truck silhouette, cab/front pointing up.
+  return `<svg ${common}>
+    <path d="M12 1.5L15 8.5H9L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+    <rect x="7.5" y="8.5" width="9" height="10.5" rx="1.5" fill="${color}" stroke="white" stroke-width="0.75"/>
+    <circle cx="9.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
+    <circle cx="14.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
+  </svg>`;
 }
 
 export default function LeafletMap({
@@ -145,16 +174,17 @@ export default function LeafletMap({
       }
     }
 
-    // Pinned current-stop marker: pulse ring + dot + emoji, all anchored at current
+    // Pinned current-stop marker: pulse ring + dot + direction-facing vehicle
+    // icon, all anchored at current.
     if (current) {
-      const emoji = EMOJI[mode] || "🚛";
       const ringColor = isOnHold ? "#f59e0b" : "#3b82f6";
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
+      const iconSvg = vehicleSvg(mode, ringColor);
       const html = `
         <div style="position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center">
           <div class="${ringClass}" style="background:${ringColor}66;"></div>
           <div style="position:relative;width:14px;height:14px;background:${ringColor};border:3px solid white;border-radius:9999px;box-shadow:0 0 0 2px ${ringColor}88;"></div>
-          <div style="position:absolute;left:50%;top:-22px;transform:translateX(-50%) rotate(${bearingDeg}deg);transform-origin:50% 100%;font-size:22px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));pointer-events:none">${emoji}</div>
+          <div style="position:absolute;left:50%;top:-24px;transform:translateX(-50%) rotate(${bearingDeg}deg);transform-origin:50% 100%;width:24px;height:24px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));pointer-events:none">${iconSvg}</div>
         </div>`;
       const icon = L.divIcon({
         className: "",
