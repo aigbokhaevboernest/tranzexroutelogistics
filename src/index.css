@@ -39,6 +39,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Prevent iOS/Android auto-zoom on focus for every input on the site */
+input, select, textarea {
+  font-size: 16px;
+}
+
 .text-display { font-family: "Inter", "DM Sans", sans-serif; letter-spacing: -0.01em; }
 .text-mono { font-family: "JetBrains Mono", monospace; }
 
