@@ -452,7 +452,7 @@ export default function TrackingPage() {
 
               <PrintInvoice s={s} open={printPreview} onClose={() => setPrintPreview(false)} />
 
-              <PaymentModal
+                            <PaymentModal
                 open={payOpen}
                 onClose={() => setPayOpen(false)}
                 paymentMode={s.payment_mode}
