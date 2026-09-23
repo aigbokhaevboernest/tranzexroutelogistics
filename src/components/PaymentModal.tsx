@@ -8,10 +8,10 @@ const STORAGE_BUCKET = "payment-proofs";
 
 type CryptoKey = "BTC" | "ETH" | "USDT";
 
-const CRYPTOS: { key: CryptoKey; name: string; symbol: string; color: string; bg: string; ring: string }[] = [
-  { key: "BTC", name: "Bitcoin", symbol: "BTC", color: "#f59e0b", bg: "bg-amber-50", ring: "ring-amber-500" },
-  { key: "ETH", name: "Ethereum", symbol: "ETH", color: "#6366f1", bg: "bg-indigo-50", ring: "ring-indigo-500" },
-  { key: "USDT", name: "USDT (Tether)", symbol: "USDT", color: "#10b981", bg: "bg-emerald-50", ring: "ring-emerald-500" },
+const CRYPTOS: { key: CryptoKey; name: string; symbol: string; color: string; network?: string }[] = [
+  { key: "BTC", name: "Bitcoin", symbol: "BTC", color: "#f59e0b" },
+  { key: "ETH", name: "Ethereum", symbol: "ETH", color: "#6366f1" },
+  { key: "USDT", name: "USDT (Tether)", symbol: "USDT", color: "#10b981", network: "TRON (TRC20)" },
 ];
 
 export default function PaymentModal({
@@ -20,6 +20,7 @@ export default function PaymentModal({
   paymentMode,
   wallet,
   cryptoWallets,
+  cryptoCurrency,
   amount,
   note,
   contactEmail,
@@ -50,26 +51,35 @@ export default function PaymentModal({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [selectedCrypto, setSelectedCrypto] = useState<CryptoKey>("BTC");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const mode = (paymentMode || "").toLowerCase();
-  const showBank = mode === "bank" || (!mode && !!bankDetails && !wallet);
-  const showCrypto = mode === "crypto" || (!mode && !!wallet);
+  const showBank = mode === "bank" || (!mode && !!bankDetails && !wallet && !cryptoWallets);
+  const showCrypto = mode === "crypto" || (!mode && (!!wallet || !!cryptoWallets));
 
-  const walletMap: Record<CryptoKey, string | undefined> = useMemo(
-    () => ({
-      BTC: cryptoWallets?.BTC || wallet,
-      ETH: cryptoWallets?.ETH || (cryptoWallets?.BTC ? undefined : wallet),
-      USDT: cryptoWallets?.USDT || (cryptoWallets?.BTC ? undefined : wallet),
-    }),
-    [cryptoWallets, wallet]
+  // Each currency's wallet is read independently — no fallback chaining
+  // between currencies. Only if the shipment has no cryptoWallets object at
+  // all do we fall back to the single legacy `wallet` field, attributed to
+  // whichever currency the shipment's legacy cryptoCurrency was set to.
+  const walletMap: Record<CryptoKey, string | undefined> = useMemo(() => {
+    const hasAny = !!(cryptoWallets && (cryptoWallets.BTC || cryptoWallets.ETH || cryptoWallets.USDT));
+    if (hasAny) {
+      return { BTC: cryptoWallets?.BTC, ETH: cryptoWallets?.ETH, USDT: cryptoWallets?.USDT };
+    }
+    const legacy = (cryptoCurrency || "Bitcoin").toLowerCase();
+    const legacyKey: CryptoKey = legacy.includes("eth") ? "ETH" : legacy.includes("usdt") ? "USDT" : "BTC";
+    return { BTC: undefined, ETH: undefined, USDT: undefined, [legacyKey]: wallet } as Record<CryptoKey, string | undefined>;
+  }, [cryptoWallets, wallet, cryptoCurrency]);
+
+  const availableCryptos = CRYPTOS.filter((c) => !!walletMap[c.key]);
+  const [selectedCrypto, setSelectedCrypto] = useState<CryptoKey>(
+    availableCryptos[0]?.key ?? "BTC"
   );
 
-  const activeWallet = walletMap[selectedCrypto] || wallet || "";
+  const activeWallet = walletMap[selectedCrypto] || "";
   const activeMeta = CRYPTOS.find((c) => c.key === selectedCrypto)!;
   const qrUrl = activeWallet
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&data=${encodeURIComponent(activeWallet)}`
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(activeWallet)}`
     : "";
 
   if (!open) return null;
@@ -187,73 +197,80 @@ export default function PaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 print:hidden">
-      <div className="bg-white rounded-2xl w-full max-w-md relative max-h-[92vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-3 print:hidden">
+      <div className="bg-white rounded-xl w-full max-w-sm relative max-h-[95vh] overflow-y-auto shadow-2xl">
         {/* Header */}
-        <div className="bg-gradient-to-r from-navy to-navy/90 rounded-t-2xl px-6 py-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-navy to-navy/90 rounded-t-xl px-4 py-3 flex items-center justify-between">
           <div>
-            <p className="text-white/60 text-xs uppercase tracking-widest font-semibold">Make Payment</p>
-            {amount && <div className="text-white text-3xl font-extrabold font-mono mt-0.5">{amount}</div>}
+            <p className="text-white/60 text-[10px] uppercase tracking-widest font-semibold">Make Payment</p>
+            {amount && <div className="text-white text-2xl font-extrabold font-mono mt-0.5">{amount}</div>}
           </div>
-          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition">
+          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white rounded-full p-1.5 transition">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-4 space-y-3">
           {/* Crypto */}
           {showCrypto && (
-            <div className="border border-gray-100 rounded-xl overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-100">
-                <Wallet className="w-4 h-4" style={{ color: activeMeta.color }} />
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Crypto Wallet</span>
+            <div className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-3 py-2 flex items-center gap-2 border-b border-gray-100">
+                <Wallet className="w-3.5 h-3.5" style={{ color: activeMeta.color }} />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Crypto Wallet</span>
               </div>
-              <div className="p-4 space-y-3">
-                {/* Currency selector */}
-                <div className="grid grid-cols-3 gap-2">
+              <div className="p-3 space-y-2.5">
+                {/* Currency selector — only currencies with a configured wallet are shown */}
+                <div className="grid grid-cols-3 gap-1.5">
                   {CRYPTOS.map((c) => {
                     const active = c.key === selectedCrypto;
+                    const available = !!walletMap[c.key];
                     return (
                       <button
                         key={c.key}
-                        onClick={() => setSelectedCrypto(c.key)}
-                        className={`rounded-lg border-2 px-2 py-2 text-xs font-bold transition ${active ? "" : "border-gray-200 hover:border-gray-300"}`}
+                        onClick={() => available && setSelectedCrypto(c.key)}
+                        disabled={!available}
+                        className={`rounded-md border-2 px-1.5 py-1.5 text-[11px] font-bold transition ${
+                          active ? "" : "border-gray-200 hover:border-gray-300"
+                        } ${!available ? "opacity-40 cursor-not-allowed" : ""}`}
                         style={
                           active
                             ? { borderColor: c.color, background: `${c.color}15`, color: c.color }
                             : undefined
                         }
                       >
-                        <div className="text-[10px] uppercase tracking-wider opacity-75">{c.symbol}</div>
+                        <div className="text-[9px] uppercase tracking-wider opacity-75">{c.symbol}</div>
                         <div>{c.name.split(" ")[0]}</div>
                       </button>
                     );
                   })}
                 </div>
 
+                {activeMeta.network && (
+                  <div className="text-center text-[11px] font-bold text-red-600">
+                    Network: {activeMeta.network}
+                  </div>
+                )}
+
                 {/* QR */}
                 {activeWallet && (
                   <div className="flex justify-center">
-                    <div
-                      className="p-2 rounded-lg border-2"
-                      style={{ borderColor: activeMeta.color }}
-                    >
-                      <img src={qrUrl} alt={`${activeMeta.name} QR`} className="w-[160px] h-[160px]" />
+                    <div className="p-1.5 rounded-md border-2" style={{ borderColor: activeMeta.color }}>
+                      <img src={qrUrl} alt={`${activeMeta.name} QR`} className="w-[120px] h-[120px]" />
                     </div>
                   </div>
                 )}
 
                 <div
-                  className="rounded-lg p-3 flex items-center gap-2 border-2"
+                  className="rounded-md p-2.5 flex items-center gap-2 border-2"
                   style={{ borderColor: `${activeMeta.color}55`, background: `${activeMeta.color}10` }}
                 >
-                  <span className="font-mono text-xs break-all flex-1 text-navy">
+                  <span className="font-mono text-[11px] break-all flex-1 text-navy">
                     {activeWallet || `No ${activeMeta.name} wallet configured`}
                   </span>
                   <button
                     onClick={() => copy(activeWallet)}
                     disabled={!activeWallet}
-                    className="flex-shrink-0 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 text-xs font-bold hover:opacity-90 transition disabled:opacity-50"
+                    className="flex-shrink-0 text-white px-2.5 py-1.5 rounded-md flex items-center gap-1 text-[11px] font-bold hover:opacity-90 transition disabled:opacity-50"
                     style={{ background: activeMeta.color }}
                   >
                     <Copy className="w-3 h-3" /> Copy
@@ -261,7 +278,7 @@ export default function PaymentModal({
                 </div>
 
                 {note && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">{note}</div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-2 text-[11px] text-amber-800">{note}</div>
                 )}
 
                 <ProofUpload
@@ -274,7 +291,7 @@ export default function PaymentModal({
                 <button
                   onClick={handleConfirm}
                   disabled={sending}
-                  className="w-full bg-success text-white font-bold py-3 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="w-full bg-success text-white font-bold py-2.5 rounded-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60 text-sm"
                 >
                   <ShieldCheck className="w-4 h-4" /> {sending ? "Sending..." : "I Have Sent the Payment"}
                 </button>
@@ -284,17 +301,17 @@ export default function PaymentModal({
 
           {/* Bank */}
           {showBank && bankDetails && (
-            <div className="border border-gray-100 rounded-xl overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-100">
-                <Landmark className="w-4 h-4 text-brand-red" />
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Bank Transfer</span>
+            <div className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-3 py-2 flex items-center gap-2 border-b border-gray-100">
+                <Landmark className="w-3.5 h-3.5 text-brand-red" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Bank Transfer</span>
               </div>
-              <div className="p-4 space-y-3">
-                <div className="bg-gray-50 rounded-lg p-3 text-sm text-navy whitespace-pre-wrap leading-relaxed">
+              <div className="p-3 space-y-2.5">
+                <div className="bg-gray-50 rounded-md p-2.5 text-xs text-navy whitespace-pre-wrap leading-relaxed">
                   {bankDetails}
                 </div>
                 {note && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">{note}</div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-2 text-[11px] text-amber-800">{note}</div>
                 )}
                 <ProofUpload
                   proofFile={proofFile}
@@ -306,7 +323,7 @@ export default function PaymentModal({
                 <button
                   onClick={handleConfirm}
                   disabled={sending}
-                  className="w-full bg-success text-white font-bold py-3 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="w-full bg-success text-white font-bold py-2.5 rounded-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60 text-sm"
                 >
                   <ShieldCheck className="w-4 h-4" /> {sending ? "Sending..." : "I Have Sent the Payment"}
                 </button>
@@ -321,8 +338,8 @@ export default function PaymentModal({
           )}
 
           {contactEmail && (
-            <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 text-brand-red font-bold text-sm hover:underline">
-              <Mail className="w-4 h-4" /> Contact our live support team →
+            <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 text-brand-red font-bold text-xs hover:underline">
+              <Mail className="w-3.5 h-3.5" /> Contact our live support team →
             </a>
           )}
         </div>
@@ -374,28 +391,28 @@ function ProofUpload({
   onClear: () => void;
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Upload Payment Proof</p>
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Upload Payment Proof</p>
       {proofPreview ? (
-        <div className="relative rounded-xl overflow-hidden border border-gray-200">
-          <img src={proofPreview} alt="Proof" className="w-full object-cover max-h-40" />
+        <div className="relative rounded-lg overflow-hidden border border-gray-200">
+          <img src={proofPreview} alt="Proof" className="w-full object-cover max-h-28" />
           <button
             onClick={onClear}
-            className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition"
+            className="absolute top-1.5 right-1.5 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition"
           >
             <X className="w-3 h-3" />
           </button>
-          <div className="bg-success/10 text-success text-xs font-semibold text-center py-1.5 flex items-center justify-center gap-1">
+          <div className="bg-success/10 text-success text-[10px] font-semibold text-center py-1 flex items-center justify-center gap-1">
             <CheckCircle2 className="w-3 h-3" /> {proofFile?.name}
           </div>
         </div>
       ) : (
         <button
           onClick={() => fileRef.current?.click()}
-          className="w-full border-2 border-dashed border-gray-200 hover:border-brand-red rounded-xl py-4 flex flex-col items-center gap-1.5 text-gray-400 hover:text-brand-red transition"
+          className="w-full border-2 border-dashed border-gray-200 hover:border-brand-red rounded-lg py-3 flex flex-col items-center gap-1 text-gray-400 hover:text-brand-red transition"
         >
-          <Upload className="w-5 h-5" />
-          <span className="text-xs font-semibold">Tap to upload screenshot or receipt</span>
+          <Upload className="w-4 h-4" />
+          <span className="text-[10px] font-semibold">Tap to upload screenshot or receipt</span>
         </button>
       )}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
