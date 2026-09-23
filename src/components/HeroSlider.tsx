@@ -57,7 +57,7 @@ export default function HeroSlider() {
 
   useEffect(() => {
     if (hover) return;
-    intervalRef.current = setInterval(() => setIdx((i) => (i + 1) % SLIDES.length), 8000);
+    intervalRef.current = setInterval(() => setIdx((i) => (i + 1) % SLIDES.length), 6000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -79,7 +79,7 @@ export default function HeroSlider() {
       {SLIDES.map((s, i) => (
         <div
           key={i}
-          className={`absolute inset-0 transition-opacity duration-2000 ${i === idx ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 transition-opacity duration-2000 ease-in-out ${i === idx ? "opacity-100" : "opacity-0"}`}
           aria-hidden={i !== idx}
         >
           <img
@@ -110,15 +110,15 @@ export default function HeroSlider() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={placeholder}
-              className="flex-1 px-5 py-4 text-navy text-mono text-sm md:text-base outline-none"
+              className="flex-1 px-5 py-4 text-navy text-mono text-base outline-none"
             />
             <button type="submit" className="bg-brand-red text-white font-bold px-6 md:px-10 text-display tracking-wider">
               TRACK
             </button>
           </div>
           <div className="mt-4 flex justify-center gap-6 text-sm">
-            <a href="mailto:support@tranzexroute.com" className="text-white/90 hover:text-brand-orange underline-offset-4 hover:underline">Problem Tracking?</a>
-            <a href="mailto:support@tranzexroute.com" className="text-white/90 hover:text-brand-orange underline-offset-4 hover:underline">Need Help?</a>
+            <a href="mailto:support@tranzexlogistics.com" className="text-white/90 hover:text-brand-orange underline-offset-4 hover:underline">Problem Tracking?</a>
+            <a href="mailto:support@tranzexlogistics.com" className="text-white/90 hover:text-brand-orange underline-offset-4 hover:underline">Need Help?</a>
           </div>
         </form>
       </div>
