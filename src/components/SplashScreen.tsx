@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 
 const T = {
-  letterDur: 480,
-  stagger: 100,
-  zexPause: 80,
-  underlineDur: 500,
-  taglineDur: 500,
-  hold: 1400,
-  fadeOut: 600,
+  letterDur: 280,
+  stagger: 50,
+  zexPause: 40,
+  underlineDur: 300,
+  taglineDur: 300,
+  hold: 500,
+  fadeOut: 300,
 };
 
 const LETTERS = [
