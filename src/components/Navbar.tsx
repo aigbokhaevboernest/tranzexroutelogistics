@@ -49,21 +49,40 @@ export default function Navbar() {
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
-          className="md:hidden w-10 h-10 bg-brand-red text-white rounded-md flex items-center justify-center"
+          className="md:hidden relative w-10 h-10 bg-brand-red text-white rounded-md flex items-center justify-center overflow-hidden"
         >
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          <Menu
+            className={cn(
+              "w-5 h-5 absolute transition-all duration-300 ease-out",
+              open ? "opacity-0 rotate-90 scale-50" : "opacity-100 rotate-0 scale-100"
+            )}
+          />
+          <X
+            className={cn(
+              "w-5 h-5 absolute transition-all duration-300 ease-out",
+              open ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-90 scale-50"
+            )}
+          />
         </button>
       </div>
 
       {/* Mobile drawer */}
       <div
         className={cn(
-          "md:hidden fixed inset-0 top-16 z-40 transition-opacity duration-200",
+          "md:hidden fixed inset-0 top-16 z-40 transition-opacity duration-300",
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
       >
-        <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-        <nav className="relative bg-white border-t border-border shadow-xl">
+        <div
+          className="absolute inset-0 bg-black/50 transition-opacity duration-300"
+          onClick={() => setOpen(false)}
+        />
+        <nav
+          className={cn(
+            "relative bg-white border-t border-border shadow-xl overflow-hidden transition-all duration-300 ease-out origin-top",
+            open ? "max-h-[480px] translate-y-0 opacity-100" : "max-h-0 -translate-y-3 opacity-0"
+          )}
+        >
           <ul className="flex flex-col">
             {LINKS.map((l) => (
               <li key={l.label} className="border-b border-border">
