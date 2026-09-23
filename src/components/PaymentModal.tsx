@@ -219,37 +219,38 @@ export default function PaymentModal({
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Crypto Wallet</span>
               </div>
               <div className="p-3 space-y-2.5">
-                {/* Currency selector — only currencies with a configured wallet are shown */}
-                <div className="grid grid-cols-3 gap-1.5">
+                                {/* Currency selector — only currencies with a configured wallet are shown */}
+                <div className="grid grid-cols-3 gap-1.5 items-start">
                   {CRYPTOS.map((c) => {
                     const active = c.key === selectedCrypto;
                     const available = !!walletMap[c.key];
                     return (
-                      <button
-                        key={c.key}
-                        onClick={() => available && setSelectedCrypto(c.key)}
-                        disabled={!available}
-                        className={`rounded-md border-2 px-1.5 py-1.5 text-[11px] font-bold transition ${
-                          active ? "" : "border-gray-200 hover:border-gray-300"
-                        } ${!available ? "opacity-40 cursor-not-allowed" : ""}`}
-                        style={
-                          active
-                            ? { borderColor: c.color, background: `${c.color}15`, color: c.color }
-                            : undefined
-                        }
-                      >
-                        <div className="text-[9px] uppercase tracking-wider opacity-75">{c.symbol}</div>
-                        <div>{c.name.split(" ")[0]}</div>
-                      </button>
+                      <div key={c.key} className="flex flex-col gap-1">
+                        <button
+                          onClick={() => available && setSelectedCrypto(c.key)}
+                          disabled={!available}
+                          className={`rounded-md border-2 px-1.5 py-1.5 text-[11px] font-bold transition ${
+                            active ? "" : "border-gray-200 hover:border-gray-300"
+                          } ${!available ? "opacity-40 cursor-not-allowed" : ""}`}
+                          style={
+                            active
+                              ? { borderColor: c.color, background: `${c.color}15`, color: c.color }
+                              : undefined
+                          }
+                        >
+                          <div className="text-[9px] uppercase tracking-wider opacity-75">{c.symbol}</div>
+                          <div>{c.name.split(" ")[0]}</div>
+                        </button>
+                        {c.network && (
+                          <div className="text-center text-[9px] font-bold text-red-600 leading-tight">
+                            {c.network}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
 
-                {activeMeta.network && (
-                  <div className="text-center text-[11px] font-bold text-red-600">
-                    Network: {activeMeta.network}
-                  </div>
-                )}
 
                 {/* QR */}
                 {activeWallet && (
@@ -391,28 +392,25 @@ function ProofUpload({
   onClear: () => void;
 }) {
   return (
-    <div className="space-y-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Upload Payment Proof</p>
+    <div className="space-y-1">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Payment Proof</p>
       {proofPreview ? (
-        <div className="relative rounded-lg overflow-hidden border border-gray-200">
-          <img src={proofPreview} alt="Proof" className="w-full object-cover max-h-28" />
-          <button
-            onClick={onClear}
-            className="absolute top-1.5 right-1.5 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition"
-          >
-            <X className="w-3 h-3" />
+        <div className="flex items-center gap-2 rounded-md border border-gray-200 pl-1 pr-2 py-1">
+          <img src={proofPreview} alt="Proof" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+          <span className="text-[11px] text-success font-semibold truncate flex-1 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> {proofFile?.name}
+          </span>
+          <button onClick={onClear} className="text-gray-400 hover:text-red-600 flex-shrink-0">
+            <X className="w-3.5 h-3.5" />
           </button>
-          <div className="bg-success/10 text-success text-[10px] font-semibold text-center py-1 flex items-center justify-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> {proofFile?.name}
-          </div>
         </div>
       ) : (
         <button
           onClick={() => fileRef.current?.click()}
-          className="w-full border-2 border-dashed border-gray-200 hover:border-brand-red rounded-lg py-3 flex flex-col items-center gap-1 text-gray-400 hover:text-brand-red transition"
+          className="w-full border border-dashed border-gray-300 hover:border-brand-red rounded-md py-1.5 px-2 flex items-center justify-center gap-1.5 text-gray-400 hover:text-brand-red transition"
         >
-          <Upload className="w-4 h-4" />
-          <span className="text-[10px] font-semibold">Tap to upload screenshot or receipt</span>
+          <Upload className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-semibold">Tap to upload screenshot or receipt</span>
         </button>
       )}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
