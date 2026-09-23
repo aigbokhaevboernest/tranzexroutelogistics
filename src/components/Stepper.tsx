@@ -62,6 +62,29 @@ export const SEA_STEPS: StepDef[] = [
   { key: "Delivered", label: "Delivered", icon: CheckCircle2, color: C_GREEN },
 ];
 
+// Short status-progress descriptions shown under the active step, keyed by
+// step key (lowercased). Falls back to the step label if no entry exists.
+const STEP_DESCRIPTIONS: Record<string, string> = {
+  "origin warehouse": "Shipment confirmed and received for dispatch",
+  "origin airport": "Shipment confirmed and received for dispatch",
+  "origin port": "Shipment confirmed and received for dispatch",
+  "in-transit": "Moving toward destination",
+  "at sea": "Moving toward destination",
+  "departed": "Left the airport",
+  "departed port": "Left the port",
+  "in flight": "Airborne and flying toward its next destination",
+  "arrived at depot": "Arrived and being processed for final delivery",
+  "arrived at nearest airport": "Arrived and being processed for final delivery",
+  "arrived at destination port": "Arrived and being processed for final delivery",
+  "pick-up": "Out for pickup and final delivery",
+  "delivered": "Delivery completed",
+  "on hold": "Shipment on hold — action required",
+};
+
+function getDescription(key: string): string {
+  return STEP_DESCRIPTIONS[key.toLowerCase()] || "";
+}
+
 const FAILED_STATUSES = ["FAILED", "Failed", "Returned To Warehouse", "Returned To Origin"];
 
 export function getSteps(mode?: string | null): StepDef[] {
@@ -75,6 +98,16 @@ function normalize(status: string) {
   return (status || "").toLowerCase().trim();
 }
 
+// The list of steps actually shown on the frontend. "On Hold" is only ever
+// included when the shipment's real status is On Hold (set from admin) —
+// it must never appear as a normal step in the sequence otherwise, in any
+// mode, on desktop or mobile.
+export function getVisibleSteps(mode?: string | null, status?: string): StepDef[] {
+  const steps = getSteps(mode);
+  if (normalize(status || "") === "on hold") return steps;
+  return steps.filter((s) => s.key.toLowerCase() !== "on hold");
+}
+
 function findActiveIdx(steps: StepDef[], status: string) {
   const norm = normalize(status);
   const idx = steps.findIndex((s) => s.key.toLowerCase() === norm);
@@ -85,7 +118,7 @@ function findActiveIdx(steps: StepDef[], status: string) {
     const i = steps.findIndex((s) => /flight|sea|transit/i.test(s.key));
     if (i >= 0) return i;
   }
-  if (norm.includes("hold")) return steps.findIndex((s) => s.key === "On Hold");
+  if (norm.includes("hold")) return steps.findIndex((s) => s.key.toLowerCase() === "on hold");
   if (norm.includes("depot") || norm.includes("airport") || norm.includes("port")) {
     const i = steps.findIndex((s) => /depot|airport|port/i.test(s.key) && !/origin/i.test(s.key));
     if (i >= 0) return i;
@@ -111,7 +144,7 @@ export function getStepColor(status: string, mode?: string): string {
 }
 
 export function getCurrentStopIndex(status: string, mode?: string) {
-  const steps = getSteps(mode);
+  const steps = getVisibleSteps(mode, status);
   if (FAILED_STATUSES.includes(status)) return 0;
   return Math.max(0, findActiveIdx(steps, status));
 }
@@ -125,12 +158,19 @@ export default function Stepper({
   // legacy prop, ignored
   showAirport?: boolean;
 }) {
-  const steps = getSteps(transportMode);
+  const steps = getVisibleSteps(transportMode, status);
   const failed = FAILED_STATUSES.includes(status);
   const activeIdx = failed ? -1 : findActiveIdx(steps, status);
 
   return (
     <div className="bg-white border border-border rounded-md p-6">
+      <div className="mb-6">
+        <div className="text-display text-lg md:text-xl font-extrabold uppercase tracking-wide text-navy">
+          Delivery Progress
+        </div>
+        <div className="text-sm text-muted-foreground mt-0.5">Your shipment journey</div>
+      </div>
+
       {/* Desktop */}
       <div className="hidden md:flex items-start justify-between gap-2">
         {steps.map((s, i) => {
@@ -138,6 +178,7 @@ export default function Stepper({
           const active = i === activeIdx;
           const gray = failed || i > activeIdx;
           const bg = gray ? "oklch(0.85 0 0)" : s.color;
+          const desc = getDescription(s.key);
           return (
             <div key={s.key} className="flex-1 flex flex-col items-center text-center relative">
               <div
@@ -150,9 +191,9 @@ export default function Stepper({
                 <s.icon className="w-6 h-6 text-white" />
               </div>
               <div className="mt-2 text-xs font-bold text-navy uppercase">{s.label}</div>
-              {active && (
-                <div className="text-[10px] font-semibold mt-0.5" style={{ color: s.color }}>
-                  Current step
+              {active && desc && (
+                <div className="text-[10px] font-semibold mt-0.5 max-w-[9rem]" style={{ color: s.color }}>
+                  {desc}
                 </div>
               )}
               {i < steps.length - 1 && (
@@ -173,6 +214,7 @@ export default function Stepper({
           const gray = failed || i > activeIdx;
           const bg = gray ? "oklch(0.85 0 0)" : s.color;
           const isLast = i === steps.length - 1;
+          const desc = getDescription(s.key);
           return (
             <div key={s.key} className="flex items-stretch gap-4">
               <div className="flex flex-col items-center">
@@ -197,9 +239,9 @@ export default function Stepper({
               </div>
               <div className={cn("pt-3", !isLast && "pb-6")}>
                 <div className="text-sm font-bold text-navy uppercase">{s.label}</div>
-                {active && (
+                {active && desc && (
                   <div className="text-xs font-semibold mt-0.5" style={{ color: s.color }}>
-                    Current step
+                    {desc}
                   </div>
                 )}
               </div>
