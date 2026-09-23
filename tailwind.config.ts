@@ -34,6 +34,9 @@ export default {
         sans: ["Inter", "DM Sans", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
+      transitionDuration: {
+        "2000": "2000ms",
+      },
       keyframes: {
         kenburns: { "0%": { transform: "scale(1)" }, "100%": { transform: "scale(1.10)" } },
         "slide-up-fade": {
