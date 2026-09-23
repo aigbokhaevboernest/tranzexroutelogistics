@@ -64,14 +64,12 @@ function vehicleSvg(mode: TransportMode, color: string): string {
   const common = `width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
 
   if (mode === "air") {
-    // Simple airplane silhouette, nose pointing up.
     return `<svg ${common}>
       <path d="M12 1.5L13.4 8.5L21.5 11.5L13.6 12.6L14.8 21L12 18.2L9.2 21L10.4 12.6L2.5 11.5L10.6 8.5L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
     </svg>`;
   }
 
   if (mode === "sea") {
-    // Boat/ship silhouette, bow pointing up.
     return `<svg ${common}>
       <path d="M12 2L15.2 10.5H8.8L12 2Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
       <rect x="10" y="10.5" width="4" height="6" fill="${color}" stroke="white" stroke-width="0.75"/>
@@ -79,13 +77,23 @@ function vehicleSvg(mode: TransportMode, color: string): string {
     </svg>`;
   }
 
-  // land — truck silhouette, cab/front pointing up.
   return `<svg ${common}>
     <path d="M12 1.5L15 8.5H9L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
     <rect x="7.5" y="8.5" width="9" height="10.5" rx="1.5" fill="${color}" stroke="white" stroke-width="0.75"/>
     <circle cx="9.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
     <circle cx="14.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
   </svg>`;
+}
+
+// Carto's rastertiles now require a free API key (their anonymous/unauth
+// access was turned off). Get one at https://carto.com/basemaps/apikey and
+// set it as VITE_CARTO_API_KEY in your .env file — no code change needed
+// after that.
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY as string | undefined;
+
+function tileUrl() {
+  const base = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  return CARTO_API_KEY ? `${base}?api_key=${CARTO_API_KEY}` : base;
 }
 
 export default function LeafletMap({
@@ -115,7 +123,7 @@ export default function LeafletMap({
       4
     );
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    L.tileLayer(tileUrl(), {
       maxZoom: 19,
     }).addTo(map);
 
@@ -144,15 +152,12 @@ export default function LeafletMap({
     if (origin) addStaticMarker(origin, colors.origin);
     if (destination) addStaticMarker(destination, colors.destination);
 
-    // Compute bearing from current toward destination (or origin toward destination)
     const bearingDeg = (() => {
       const a = current || origin;
       const b = destination || current;
       if (!a || !b) return 0;
-      // Map screen: +lng = right, +lat = up. We want 0deg = up (north).
       const dx = b.lng - a.lng;
       const dy = b.lat - a.lat;
-      // atan2(dx, dy) gives angle clockwise from north
       const rad = Math.atan2(dx, dy);
       return (rad * 180) / Math.PI;
     })();
@@ -174,8 +179,6 @@ export default function LeafletMap({
       }
     }
 
-    // Pinned current-stop marker: pulse ring + dot + direction-facing vehicle
-    // icon, all anchored at current.
     if (current) {
       const ringColor = isOnHold ? "#f59e0b" : "#3b82f6";
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
