@@ -85,17 +85,6 @@ function vehicleSvg(mode: TransportMode, color: string): string {
   </svg>`;
 }
 
-// Carto's rastertiles now require a free API key (their anonymous/unauth
-// access was turned off). Get one at https://carto.com/basemaps/apikey and
-// set it as VITE_CARTO_API_KEY in your .env file — no code change needed
-// after that.
-const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY as string | undefined;
-
-function tileUrl() {
-  const base = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-  return CARTO_API_KEY ? `${base}?api_key=${CARTO_API_KEY}` : base;
-}
-
 export default function LeafletMap({
   origin,
   current,
@@ -123,8 +112,9 @@ export default function LeafletMap({
       4
     );
 
-    L.tileLayer(tileUrl(), {
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
+      attribution: '© OpenStreetMap',
     }).addTo(map);
 
     const isOnHold = (status || "").toLowerCase().includes("hold");
