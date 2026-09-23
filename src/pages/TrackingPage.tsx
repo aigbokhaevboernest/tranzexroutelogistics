@@ -13,7 +13,7 @@ import SectionTitle from "@/components/SectionTitle";
 import BoldChip from "@/components/BoldChip";
 import Row from "@/components/Row";
 import PartyCard from "@/components/PartyCard";
-import Stepper, { getStepColor, getCurrentStopIndex, getSteps } from "@/components/Stepper";
+import Stepper, { getStepColor, getCurrentStopIndex, getVisibleSteps } from "@/components/Stepper";
 import Countdown from "@/components/Countdown";
 import MapInfoBar from "@/components/MapInfoBar";
 import LeafletMap from "@/components/LeafletMap";
@@ -25,7 +25,7 @@ import trackingHero from "@/assets/tracking-hero.jpg";
 const COMPANY = {
   name: "Tranzex Route Logistics",
   address: "1428 Harbor View Avenue, Manila, Philippines 1000",
-  email: "support@tranzexroute.com",
+  email: "support@tranzexlogistics.com",
   phone: "+63 (2) 8123 4567",
 };
 
@@ -40,9 +40,6 @@ function isCustomsComment(text?: string) {
   return CUSTOMS_KEYWORDS.some((k) => t.includes(k));
 }
 
-// Maps a shipment's transport_mode value to the label + icon shown on the
-// summary card. Keys are lowercase since transport_mode can come from the
-// DB with inconsistent casing.
 const TRANSPORT_META: Record<string, { label: string; icon: typeof Plane }> = {
   air: { label: "Air Freight", icon: Plane },
   sea: { label: "Sea Freight", icon: Ship },
@@ -164,7 +161,6 @@ export default function TrackingPage() {
       ? { lat: Number(s.destination_lat), lng: Number(s.destination_lng), label: s.destination_label || "Destination" }
       : null;
 
-  // Build bank details string for PaymentModal from individual columns
   const bankDetailsForModal = s ? [
     s.bank_name,
     s.bank_account_name,
@@ -187,7 +183,7 @@ export default function TrackingPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Enter tracking number"
-                className="flex-1 px-5 py-4 text-navy text-mono text-sm outline-none"
+                className="flex-1 px-5 py-4 text-navy text-mono text-base outline-none"
               />
               <button type="submit" className="bg-brand-red text-white font-bold px-6 flex items-center gap-2">
                 <Search className="w-4 h-4" /> TRACK
@@ -439,7 +435,7 @@ export default function TrackingPage() {
                   destination={s.destination_label}
                   transportMode={s.transport_mode}
                   currentStopIndex={getCurrentStopIndex(s.status, s.transport_mode)}
-                  totalStops={getSteps(s.transport_mode).length}
+                  totalStops={getVisibleSteps(s.transport_mode, s.status).length}
                 />
                 <LeafletMap
                   origin={origin}
