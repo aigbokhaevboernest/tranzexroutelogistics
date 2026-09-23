@@ -40,9 +40,9 @@ export default function Footer() {
         <div>
           <h4 className="text-display font-bold uppercase tracking-wider mb-4">Let Us Help</h4>
           <ul className="space-y-2 text-sm text-white/70">
-            <li><a href="mailto:support@tranzexroute.com" className="hover:text-brand-red">Customer Service</a></li>
-            <li><a href="mailto:support@tranzexroute.com" className="hover:text-brand-red">File a Claim</a></li>
-            <li><a href="mailto:support@tranzexroute.com" className="hover:text-brand-red">Contact Us</a></li>
+            <li><a href="mailto:support@tranzexlogistics.com" className="hover:text-brand-red">Customer Service</a></li>
+            <li><a href="mailto:support@tranzexlogistics.com" className="hover:text-brand-red">File a Claim</a></li>
+            <li><a href="mailto:support@tranzexlogistics.com" className="hover:text-brand-red">Contact Us</a></li>
           </ul>
         </div>
       </div>
