@@ -5,7 +5,7 @@ const LOGO_URL = "https://nzideivdechbxhepmlvz.supabase.co/storage/v1/object/pub
 
 const COMPANY = {
   name: "Tranzex Route Logistics",
-  email: "support@tranzexroute.com",
+  email: "support@tranzexlogistics.com",
 };
 
 function StampSVG({ label, color }: { label: string; color: string }) {
