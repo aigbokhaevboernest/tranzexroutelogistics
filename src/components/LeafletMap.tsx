@@ -89,7 +89,7 @@ function vehicleSvg(mode: TransportMode, color: string): string {
 // Vercel env var and no build-time injection step.
 const CARTO_KEY = "cb1_3uok_1_f6d3991685906b9cf3d2e547";
 const CARTO_TILES =
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=" + CARTO_KEY;
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key="cb1_3uok_1_f6d3991685906b9cf3d2e547;
 
 export default function LeafletMap({
   origin,
