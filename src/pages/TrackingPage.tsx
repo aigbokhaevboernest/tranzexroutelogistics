@@ -16,7 +16,7 @@ import PartyCard from "@/components/PartyCard";
 import Stepper, { getStepColor, getCurrentStopIndex, getVisibleSteps } from "@/components/Stepper";
 import Countdown from "@/components/Countdown";
 import MapInfoBar from "@/components/MapInfoBar";
-import LeafletMap from "@/components/LeafletMap";
+import LeafletMap, { MapLegend } from "@/components/LeafletMap";
 import PaymentModal from "@/components/PaymentModal";
 import PrintInvoice from "@/components/PrintInvoice";
 import ShipmentHistory from "@/components/ShipmentHistory";
@@ -97,7 +97,8 @@ export default function TrackingPage() {
           bank_name, bank_account_number, bank_account_name, bank_details,
           payment_instruction_note, bank_instruction_note,
           proof_of_delivery_url, updated_at,
-          payment_mode, transport_mode, crypto_currency
+          payment_mode, transport_mode, crypto_currency,
+          checkpoints
         `)
         .eq("tracking_number", submitted)
         .maybeSingle();
@@ -375,107 +376,4 @@ export default function TrackingPage() {
                         style={{ background: getStepColor(s.status, s.transport_mode) }}
                       >
                         {s.status}
-                      </span>
-                    </div>
-                  </div>
-                  {s.comments && (
-                    <div className="sm:col-span-2 mt-3">
-                      <div className="text-muted-foreground uppercase text-xs font-bold tracking-wider mb-1">Comments</div>
-                      <div className={
-                        commentHighlight
-                          ? "bg-warning/25 border-l-4 border-warning rounded p-3 text-navy text-sm font-medium"
-                          : "bg-secondary border border-border rounded p-3 text-navy text-sm"
-                      }>
-                        {s.comments}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Stepper */}
-              <Stepper status={s.status} transportMode={s.transport_mode} />
-
-              {/* Shipper */}
-              <div className="bg-white rounded-md p-6 border border-border">
-                <SectionTitle>Shipper Information</SectionTitle>
-                <PartyCard
-                  title="Shipper"
-                  name={s.sender_name}
-                  phone={s.sender_phone}
-                  email={s.sender_email}
-                  address={s.sender_address}
-                />
-              </div>
-
-              {/* Consignee */}
-              <div className="bg-white rounded-md p-6 border border-border">
-                <SectionTitle>Consignee Information</SectionTitle>
-                <PartyCard
-                  title="Consignee"
-                  name={s.receiver_name}
-                  phone={s.receiver_phone}
-                  email={s.receiver_email}
-                  address={s.receiver_address}
-                  country={s.receiver_country}
-                />
-              </div>
-
-              {/* History */}
-              <div className="bg-white rounded-md p-6 border border-border">
-                <SectionTitle>Shipment History</SectionTitle>
-                <ShipmentHistory history={s.history} />
-              </div>
-
-              {/* Map */}
-              <div className="bg-white rounded-md border border-border overflow-hidden">
-                <MapInfoBar
-                  origin={s.origin_label}
-                  current={s.current_stop_label || s.current_location}
-                  destination={s.destination_label}
-                  transportMode={s.transport_mode}
-                  currentStopIndex={getCurrentStopIndex(s.status, s.transport_mode)}
-                  totalStops={getVisibleSteps(s.transport_mode, s.status).length}
-                />
-                <LeafletMap
-                  origin={origin}
-                  current={current}
-                  destination={destination}
-                  transportMode={s.transport_mode}
-                  status={s.status}
-                />
-              </div>
-
-              <div className="text-xs text-muted-foreground text-right">
-                Last updated: {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
-              </div>
-
-              <PrintInvoice s={s} open={printPreview} onClose={() => setPrintPreview(false)} />
-
-                            <PaymentModal
-                open={payOpen}
-                onClose={() => setPayOpen(false)}
-                paymentMode={s.payment_mode}
-                cryptoCurrency={s.crypto_currency}
-                wallet={s.crypto_wallet_address}
-                cryptoWallets={s.crypto_wallets}
-                bankDetails={bankDetailsForModal}
-                bankName={s.bank_name}
-                bankAccountNumber={s.bank_account_number}
-                bankAccountName={s.bank_account_name}
-                bankInstructionNote={s.bank_instruction_note}
-                amount={s.amount_due || "—"}
-                note={s.payment_instruction_note}
-                contactEmail={s.hold_contact_email || COMPANY.email}
-                trackingNumber={s.tracking_number}
-                consigneeName={s.receiver_name}
-                consigneeEmail={s.receiver_email}
-              />
-            </>
-          )}
-        </div>
-      </main>
-      <Footer />
-    </>
-  );
-}
+                      
