@@ -3,6 +3,13 @@ import L from "leaflet";
 
 type Pt = { lat: number; lng: number; label: string };
 export type TransportMode = "land" | "air" | "sea";
+export type Checkpoint = {
+  label: string;
+  type: "customs" | "checkpoint";
+  note?: string;
+  lat?: number | null;
+  lng?: number | null;
+};
 
 function curveBetween(
   a: { lat: number; lng: number },
@@ -85,11 +92,25 @@ function vehicleSvg(mode: TransportMode, color: string): string {
   </svg>`;
 }
 
+// Customs = amber shield with checkmark. Checkpoint = gray flag.
+function checkpointSvg(type: "customs" | "checkpoint"): string {
+  if (type === "customs") {
+    return `<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L4 5V11C4 16 7.5 20.5 12 22C16.5 20.5 20 16 20 11V5L12 2Z" fill="#f59e0b" stroke="white" stroke-width="1"/>
+      <path d="M9 12L11 14L15 10" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+  return `<svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <line x1="5" y1="3" x2="5" y2="21" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+    <path d="M5 4H18L15 8L18 12H5V4Z" fill="#64748b"/>
+  </svg>`;
+}
+
 // Carto requires ?key= (not api_key). Hardcoded here so it works with no
 // Vercel env var and no build-time injection step.
 const CARTO_KEY = "cb1_3uok_1_f6d3991685906b9cf3d2e547";
 const CARTO_TILES =
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key="cb1_3uok_1_f6d3991685906b9cf3d2e547;
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=" + CARTO_KEY;
 
 export default function LeafletMap({
   origin,
@@ -97,12 +118,14 @@ export default function LeafletMap({
   destination,
   transportMode = "land",
   status,
+  checkpoints = [],
 }: {
   origin?: Pt | null;
   current?: Pt | null;
   destination?: Pt | null;
   transportMode?: TransportMode | string;
   status?: string;
+  checkpoints?: Checkpoint[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -148,6 +171,30 @@ export default function LeafletMap({
 
     if (origin) addStaticMarker(origin, colors.origin);
     if (destination) addStaticMarker(destination, colors.destination);
+
+    // Checkpoint / customs markers along the route. Tap to see label,
+    // type and note in a popup (kept out of the always-visible tooltip
+    // layer so the map doesn't get cluttered with many stops).
+    checkpoints
+      .filter((c) => c.lat != null && c.lng != null)
+      .forEach((c) => {
+        const ringColor = c.type === "customs" ? "#f59e0b" : "#64748b";
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:white;border-radius:9999px;box-shadow:0 1px 4px rgba(0,0,0,0.3);border:2px solid ${ringColor}">${checkpointSvg(c.type)}</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        });
+        L.marker([c.lat as number, c.lng as number], { icon })
+          .addTo(map)
+          .bindPopup(
+            `<div style="font-family:Inter,sans-serif;font-size:12px;min-width:140px">
+              <div style="font-weight:700;color:${c.type === "customs" ? "#b45309" : "#334155"};text-transform:uppercase;font-size:10px;letter-spacing:0.05em">${c.type}</div>
+              <div style="font-weight:600;margin-top:2px">${c.label}</div>
+              ${c.note ? `<div style="color:#64748b;margin-top:2px">${c.note}</div>` : ""}
+            </div>`
+          );
+      });
 
     const bearingDeg = (() => {
       const a = current || origin;
@@ -200,13 +247,34 @@ export default function LeafletMap({
         );
     }
 
-    const group = L.featureGroup(points.map((p) => L.marker([p.lat, p.lng])));
+    const boundsPoints = [
+      ...points,
+      ...checkpoints.filter((c) => c.lat != null && c.lng != null).map((c) => ({ lat: c.lat as number, lng: c.lng as number })),
+    ];
+    const group = L.featureGroup(boundsPoints.map((p) => L.marker([p.lat, p.lng])));
     map.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 6 });
 
     return () => {
       map.remove();
     };
-  }, [origin, current, destination, transportMode, status]);
+  }, [origin, current, destination, transportMode, status, checkpoints]);
 
   return <div ref={ref} className="w-full h-[420px] overflow-hidden" />;
+}
+
+// Legend shown under the map — only renders the rows that are actually
+// relevant to this shipment (customs/checkpoint rows only appear if the
+// shipment has at least one of that type).
+export function MapLegend({ checkpoints = [] }: { checkpoints?: Checkpoint[] }) {
+  const hasCustoms = checkpoints.some((c) => c.type === "customs");
+  const hasCheckpoint = checkpoints.some((c) => c.type === "checkpoint");
+  return (
+    <div className="flex flex-wrap items-center gap-4 px-4 py-2 text-xs text-muted-foreground border-t border-border bg-secondary/50">
+      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" /> Origin</div>
+      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Destination</div>
+      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Current</div>
+      {hasCustoms && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" /> Customs</div>}
+      {hasCheckpoint && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#64748b]" /> Checkpoint</div>}
+    </div>
+  );
 }
