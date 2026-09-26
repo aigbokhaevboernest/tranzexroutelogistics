@@ -4,17 +4,6 @@ import L from "leaflet";
 type Pt = { lat: number; lng: number; label: string };
 export type TransportMode = "land" | "air" | "sea";
 
-// Inline SVG icon paths (lucide-style), replacing the emoji markers.
-// Each is drawn pointing "up" (north) by default, then rotated via bearingDeg
-// to face the actual direction of travel along the route.
-const ICON_SVG: Record<TransportMode, string> = {
-  land: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l4 4v4h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
-  air: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.4 5.8c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`,
-  sea: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.53 7.24"/><path d="M19 13V7a2 2 0 0 0-2-2h-3"/><path d="M12 10V4a1 1 0 0 0-1-1H8.3a1 1 0 0 0-.9.6L6 7"/></svg>`,
-};
-
-const EMOJI: Record<string, string> = { land: "🚛", air: "✈️", sea: "🚢" };
-
 function curveBetween(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
@@ -41,6 +30,7 @@ function curveBetween(
   return points;
 }
 
+// Inject pulse keyframes once
 const STYLE_ID = "leaflet-pulse-styles";
 function ensureStyles() {
   if (typeof document === "undefined") return;
@@ -66,6 +56,40 @@ function ensureStyles() {
   `;
   document.head.appendChild(style);
 }
+
+// Direction-aware vehicle glyphs — each drawn "nose up" (pointing north /
+// 0deg) so the same rotate(${bearingDeg}deg) transform used for the marker
+// correctly points the vehicle along the route in every direction.
+function vehicleSvg(mode: TransportMode, color: string): string {
+  const common = `width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
+
+  if (mode === "air") {
+    return `<svg ${common}>
+      <path d="M12 1.5L13.4 8.5L21.5 11.5L13.6 12.6L14.8 21L12 18.2L9.2 21L10.4 12.6L2.5 11.5L10.6 8.5L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  if (mode === "sea") {
+    return `<svg ${common}>
+      <path d="M12 2L15.2 10.5H8.8L12 2Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+      <rect x="10" y="10.5" width="4" height="6" fill="${color}" stroke="white" stroke-width="0.75"/>
+      <path d="M3.5 18C6 20.3 9 21.5 12 21.5C15 21.5 18 20.3 20.5 18L18.5 15.8H5.5L3.5 18Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  return `<svg ${common}>
+    <path d="M12 1.5L15 8.5H9L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+    <rect x="7.5" y="8.5" width="9" height="10.5" rx="1.5" fill="${color}" stroke="white" stroke-width="0.75"/>
+    <circle cx="9.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
+    <circle cx="14.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
+  </svg>`;
+}
+
+// Carto requires ?key= (not api_key). Hardcoded here so it works with no
+// Vercel env var and no build-time injection step.
+const CARTO_KEY = "cb1_3uok_1_f6d3991685906b9cf3d2e547";
+const CARTO_TILES =
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=" + CARTO_KEY;
 
 export default function LeafletMap({
   origin,
@@ -94,8 +118,10 @@ export default function LeafletMap({
       4
     );
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
+    L.tileLayer(CARTO_TILES, {
+      maxZoom: 20,
+      subdomains: "abcd",
+      attribution: '© OpenStreetMap, © CARTO',
     }).addTo(map);
 
     const isOnHold = (status || "").toLowerCase().includes("hold");
@@ -123,7 +149,6 @@ export default function LeafletMap({
     if (origin) addStaticMarker(origin, colors.origin);
     if (destination) addStaticMarker(destination, colors.destination);
 
-    // Compute bearing from current toward destination (or origin toward destination)
     const bearingDeg = (() => {
       const a = current || origin;
       const b = destination || current;
@@ -151,16 +176,15 @@ export default function LeafletMap({
       }
     }
 
-    // Pinned current-stop marker: pulse ring + dot + SVG icon, rotated to face travel direction
     if (current) {
-      const svg = ICON_SVG[mode] || ICON_SVG.land;
       const ringColor = isOnHold ? "#f59e0b" : "#3b82f6";
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
+      const iconSvg = vehicleSvg(mode, ringColor);
       const html = `
         <div style="position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center">
           <div class="${ringClass}" style="background:${ringColor}66;"></div>
           <div style="position:relative;width:14px;height:14px;background:${ringColor};border:3px solid white;border-radius:9999px;box-shadow:0 0 0 2px ${ringColor}88;"></div>
-          <div style="position:absolute;left:50%;top:-22px;transform:translateX(-50%) rotate(${bearingDeg}deg);transform-origin:50% 100%;color:${ringColor};filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));pointer-events:none">${svg}</div>
+          <div style="position:absolute;left:50%;top:-24px;transform:translateX(-50%) rotate(${bearingDeg}deg);transform-origin:50% 100%;width:24px;height:24px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));pointer-events:none">${iconSvg}</div>
         </div>`;
       const icon = L.divIcon({
         className: "",
@@ -184,4 +208,5 @@ export default function LeafletMap({
     };
   }, [origin, current, destination, transportMode, status]);
 
-  return 
+  return <div ref={ref} className="w-full h-[420px] overflow-hidden" />;
+}
