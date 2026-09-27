@@ -41,7 +41,31 @@ function curveBetween(
   return points;
 }
 
-// Inject pulse keyframes once
+// Fetches a real road-following route for land mode from OSRM's free
+// public routing server (no API key required). Returns null on any
+// failure/timeout so the caller can fall back to a straight line.
+async function fetchRoadRoute(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number }
+): Promise<[number, number][] | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const coords = data?.routes?.[0]?.geometry?.coordinates;
+    if (!Array.isArray(coords) || !coords.length) return null;
+    // OSRM returns [lng, lat] pairs — flip to Leaflet's [lat, lng]
+    return coords.map((c: [number, number]) => [c[1], c[0]]);
+  } catch {
+    return null;
+  }
+}
+
+// Inject pulse keyframes + tooltip/hint styles once
 const STYLE_ID = "leaflet-pulse-styles";
 function ensureStyles() {
   if (typeof document === "undefined") return;
@@ -64,21 +88,39 @@ function ensureStyles() {
     .lm-pulse-ring.hold {
       animation: lm-pulse-hold 0.9s ease-out infinite;
     }
+    .leaflet-tooltip.lm-current-tooltip {
+      padding: 2px 7px;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    .lm-touch-hint {
+      position: absolute; inset: 0; z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(15,23,42,0.45); color: white;
+      font-family: Inter, sans-serif; font-size: 13px; font-weight: 600;
+      text-align: center; padding: 16px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+    .lm-touch-hint.visible { opacity: 1; }
   `;
   document.head.appendChild(style);
 }
 
-const MODE_COLORS: Record<TransportMode, string> = {
-  land: "#ef4444",
+// Single source of truth for mode color — the pulsing ring, the vehicle
+// silhouette inside it, MapInfoBar's "Current Stop" dot, and MapLegend's
+// "Current" dot all read from this same map, so they always stay in sync.
+// Hold status overrides all of them to amber regardless of mode.
+export const MODE_COLORS: Record<TransportMode, string> = {
+  land: "#f97316",
   air: "#3b82f6",
   sea: "#92400e",
 };
+export const HOLD_COLOR = "#f59e0b";
 
 // Standalone filled icons, drawn facing RIGHT by default — no location pin.
-// Plane: top-down artwork, rotated 90deg in the SVG itself so it faces
-// right at rest. Truck/Ship: side-view artwork, already facing right.
 function vehicleSvg(mode: TransportMode, color: string): string {
-  const s = `width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
+  const s = `width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
 
   if (mode === "air") {
     return `<svg ${s}>
@@ -147,6 +189,7 @@ export default function LeafletMap({
   checkpoints?: Checkpoint[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const hintRef = useRef<HTMLDivElement>(null);
 
   const validOrigin = origin && isValidCoord(origin.lat, origin.lng) ? origin : null;
   const validCurrent = current && isValidCoord(current.lat, current.lng) ? current : null;
@@ -158,13 +201,15 @@ export default function LeafletMap({
   useEffect(() => {
     if (!ref.current || !hasAnyPoint) return;
     ensureStyles();
+    let cancelled = false;
     const mode = ((transportMode || "land").toLowerCase() as TransportMode);
     const points = [validOrigin, validCurrent, validDestination].filter(Boolean) as Pt[];
 
-    const map = L.map(ref.current, { zoomControl: true, attributionControl: false }).setView(
-      [points[0].lat, points[0].lng],
-      4
-    );
+    const map = L.map(ref.current, {
+      zoomControl: true,
+      attributionControl: false,
+      scrollWheelZoom: false, // prevent page-scroll from being hijacked by the map
+    }).setView([points[0].lat, points[0].lng], 4);
 
     const cartoLayer = L.tileLayer(CARTO_TILES, {
       maxZoom: 20,
@@ -184,10 +229,60 @@ export default function LeafletMap({
       }).addTo(map);
     });
 
+    // --- Locked map: require two fingers to pan on touch devices ---
+    // Single-finger touch is left alone so the page keeps scrolling
+    // normally; only when a second finger joins does the map start
+    // panning. Mouse/desktop dragging is left as normal map behavior.
+    const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    let hintTimeout: ReturnType<typeof setTimeout> | null = null;
+    const showHint = () => {
+      const el = hintRef.current;
+      if (!el) return;
+      el.classList.add("visible");
+      if (hintTimeout) clearTimeout(hintTimeout);
+      hintTimeout = setTimeout(() => el.classList.remove("visible"), 1100);
+    };
+
+    if (isTouchDevice) {
+      map.dragging.disable();
+      const container = ref.current;
+
+      const onTouchStart = (e: TouchEvent) => {
+        if (e.touches.length >= 2) {
+          map.dragging.enable();
+        } else {
+          map.dragging.disable();
+          showHint();
+        }
+      };
+      const onTouchMove = (e: TouchEvent) => {
+        if (e.touches.length >= 2) {
+          e.preventDefault();
+          map.dragging.enable();
+        } else {
+          map.dragging.disable();
+        }
+      };
+      const onTouchEnd = (e: TouchEvent) => {
+        if (e.touches.length < 2) map.dragging.disable();
+      };
+
+      container.addEventListener("touchstart", onTouchStart, { passive: true });
+      container.addEventListener("touchmove", onTouchMove, { passive: false });
+      container.addEventListener("touchend", onTouchEnd, { passive: true });
+
+      (map as any)._lmTouchCleanup = () => {
+        container.removeEventListener("touchstart", onTouchStart);
+        container.removeEventListener("touchmove", onTouchMove);
+        container.removeEventListener("touchend", onTouchEnd);
+        if (hintTimeout) clearTimeout(hintTimeout);
+      };
+    }
+
     const isOnHold = (status || "").toLowerCase().includes("hold");
     const colors = {
       origin: "#22c55e",
-      current: isOnHold ? "#f59e0b" : "#3b82f6",
+      current: isOnHold ? HOLD_COLOR : MODE_COLORS[mode],
       destination: "#ef4444",
     } as const;
 
@@ -238,54 +333,93 @@ export default function LeafletMap({
     const bearingDeg = a && b ? (Math.atan2(dx, dy) * 180) / Math.PI : 0;
     const headingWest = dx < 0;
 
+    // --- Route lines ---
+    // Land mode tries a real road-following route via OSRM first, and
+    // draws a straight-line fallback immediately so the map never waits
+    // on the network to show something. Air/sea keep their curved paths.
     if (validOrigin && validDestination) {
       const startMid = validCurrent || validDestination;
-      const completed = curveBetween(validOrigin, startMid, mode);
-      L.polyline(completed, { color: "#3b82f6", weight: 4, opacity: 0.95 }).addTo(map);
 
-      if (validCurrent) {
-        const remaining = curveBetween(validCurrent, validDestination, mode);
-        L.polyline(remaining, {
-          color: "#94a3b8",
-          weight: 3,
-          opacity: 0.75,
-          dashArray: "8 10",
-          className: "route-dash",
-        }).addTo(map);
+      if (mode === "land") {
+        const fallbackCompleted = curveBetween(validOrigin, startMid, mode);
+        const fallbackLine = L.polyline(fallbackCompleted, { color: "#3b82f6", weight: 4, opacity: 0.95 }).addTo(map);
+
+        fetchRoadRoute(validOrigin, startMid).then((road) => {
+          if (cancelled || !road) return;
+          map.removeLayer(fallbackLine);
+          L.polyline(road, { color: "#3b82f6", weight: 4, opacity: 0.95 }).addTo(map);
+        });
+
+        if (validCurrent) {
+          const fallbackRemaining = curveBetween(validCurrent, validDestination, mode);
+          const fallbackDash = L.polyline(fallbackRemaining, {
+            color: "#94a3b8",
+            weight: 3,
+            opacity: 0.75,
+            dashArray: "8 10",
+            className: "route-dash",
+          }).addTo(map);
+
+          fetchRoadRoute(validCurrent, validDestination).then((road) => {
+            if (cancelled || !road) return;
+            map.removeLayer(fallbackDash);
+            L.polyline(road, {
+              color: "#94a3b8",
+              weight: 3,
+              opacity: 0.75,
+              dashArray: "8 10",
+              className: "route-dash",
+            }).addTo(map);
+          });
+        }
+      } else {
+        const completed = curveBetween(validOrigin, startMid, mode);
+        L.polyline(completed, { color: "#3b82f6", weight: 4, opacity: 0.95 }).addTo(map);
+
+        if (validCurrent) {
+          const remaining = curveBetween(validCurrent, validDestination, mode);
+          L.polyline(remaining, {
+            color: "#94a3b8",
+            weight: 3,
+            opacity: 0.75,
+            dashArray: "8 10",
+            className: "route-dash",
+          }).addTo(map);
+        }
       }
     }
 
+    // Current marker: ring/dot AND vehicle icon both follow the mode
+    // color (orange land / blue air / brown sea, amber on hold) — a
+    // single color drives both, kept in sync with MapInfoBar/MapLegend
+    // via the shared MODE_COLORS map. Icon and label pulled in tight to
+    // the marker so the label sits just above the icon, not over it.
     if (validCurrent) {
-      const finalColor = isOnHold ? "#f59e0b" : MODE_COLORS[mode];
+      const ringColor = isOnHold ? HOLD_COLOR : MODE_COLORS[mode];
+      const vehicleColor = ringColor;
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
-      const iconSvg = vehicleSvg(mode, finalColor);
-      // Plane artwork faces right at rest and needs the compass bearing,
-      // adjusted by -90deg since "right" (east) is bearing 90.
-      // Truck/ship artwork faces right at rest and just mirrors on X when
-      // heading west — no rotation, so the vehicle body stays upright.
+      const iconSvg = vehicleSvg(mode, vehicleColor);
       const transform =
-        mode === "air"
-          ? `rotate(${bearingDeg - 90}deg)`
-          : `scaleX(${headingWest ? -1 : 1})`;
+        mode === "air" ? `rotate(${bearingDeg - 90}deg)` : `scaleX(${headingWest ? -1 : 1})`;
       const html = `
-        <div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center">
-          <div class="${ringClass}" style="background:${finalColor}66;"></div>
-          <div style="position:relative;width:14px;height:14px;background:${finalColor};border:3px solid white;border-radius:9999px;box-shadow:0 0 0 2px ${finalColor}88;"></div>
-          <div style="position:absolute;left:50%;top:-30px;transform:translateX(-50%);width:32px;height:32px;pointer-events:none">
+        <div style="position:relative;width:42px;height:42px;display:flex;align-items:center;justify-content:center">
+          <div class="${ringClass}" style="background:${ringColor}66;"></div>
+          <div style="position:relative;width:14px;height:14px;background:${ringColor};border:3px solid white;border-radius:9999px;box-shadow:0 0 0 2px ${ringColor}88;"></div>
+          <div style="position:absolute;left:50%;top:-18px;transform:translateX(-50%);width:26px;height:26px;pointer-events:none">
             <div style="width:100%;height:100%;transform:${transform};filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35))">${iconSvg}</div>
           </div>
         </div>`;
       const icon = L.divIcon({
         className: "",
         html,
-        iconSize: [44, 44],
-        iconAnchor: [22, 22],
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
       });
       L.marker([validCurrent.lat, validCurrent.lng], { icon, interactive: false, keyboard: false })
         .addTo(map)
         .bindTooltip(
-          `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${finalColor}"></span>${validCurrent.label}</span>`,
-          { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -30] }
+          `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${ringColor}"></span>${validCurrent.label}</span>`,
+          { permanent: true, direction: "top", className: "custom-tooltip lm-current-tooltip", offset: [0, -46] }
         );
     }
 
@@ -299,35 +433,53 @@ export default function LeafletMap({
     const t = setTimeout(() => map.invalidateSize(), 200);
 
     return () => {
+      cancelled = true;
       clearTimeout(t);
+      if ((map as any)._lmTouchCleanup) (map as any)._lmTouchCleanup();
       map.remove();
     };
   }, [validOrigin, validCurrent, validDestination, transportMode, status, checkpoints, hasAnyPoint]);
 
   if (!hasAnyPoint) {
     return (
-      <div className="w-full h-[240px] sm:h-[320px] md:h-[420px] flex items-center justify-center bg-[#e8eef3] text-sm text-muted-foreground px-6 text-center">
+      <div className="w-full h-[320px] sm:h-[400px] md:h-[520px] flex items-center justify-center bg-[#e8eef3] text-sm text-muted-foreground px-6 text-center">
         Location data not available for this shipment.
       </div>
     );
   }
 
   return (
-    <div
-      ref={ref}
-      className="w-full h-[240px] sm:h-[320px] md:h-[420px] overflow-hidden bg-[#e8eef3]"
-    />
+    <div className="relative w-full h-[320px] sm:h-[400px] md:h-[520px] overflow-hidden bg-[#e8eef3]">
+      <div ref={ref} className="w-full h-full" />
+      <div ref={hintRef} className="lm-touch-hint">
+        Use two fingers to move the map
+      </div>
+    </div>
   );
 }
 
-export function MapLegend({ checkpoints = [] }: { checkpoints?: Checkpoint[] }) {
+// Legend shown under the map. "Current" reflects the current transport
+// mode's color (and amber during a hold), matching the ring on the map
+// and the MapInfoBar dot above.
+export function MapLegend({
+  checkpoints = [],
+  transportMode = "land",
+  status,
+}: {
+  checkpoints?: Checkpoint[];
+  transportMode?: string;
+  status?: string;
+}) {
+  const mode = ((transportMode || "land").toLowerCase() as TransportMode);
+  const isOnHold = (status || "").toLowerCase().includes("hold");
+  const currentColor = isOnHold ? HOLD_COLOR : MODE_COLORS[mode];
   const hasCustoms = checkpoints.some((c) => c.type === "customs");
   const hasCheckpoint = checkpoints.some((c) => c.type === "checkpoint");
   return (
     <div className="flex flex-wrap items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 text-[11px] sm:text-xs text-muted-foreground border-t border-border bg-secondary/50">
       <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" /> Origin</div>
+      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: currentColor }} /> Current</div>
       <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Destination</div>
-      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Current</div>
       {hasCustoms && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" /> Customs</div>}
       {hasCheckpoint && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#64748b]" /> Checkpoint</div>}
     </div>
