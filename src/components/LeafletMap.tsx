@@ -11,6 +11,10 @@ export type Checkpoint = {
   lng?: number | null;
 };
 
+function isValidCoord(lat: any, lng: any): boolean {
+  return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+}
+
 function curveBetween(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
@@ -64,33 +68,40 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
-// Direction-aware vehicle glyphs — each drawn "nose up" (pointing north /
-// 0deg) so the same rotate(${bearingDeg}deg) transform used for the marker
-// correctly points the vehicle along the route in every direction.
+// Filled vehicle silhouettes, drawn nose UP (north) so the existing
+// rotate(${bearingDeg}deg) wrapper still points them along the route.
+// Default fill by mode: land=red, air=blue, sea=brown. Hold state
+// overrides to amber regardless of mode (handled by caller passing color).
 function vehicleSvg(mode: TransportMode, color: string): string {
-  const common = `width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
+  const common = `width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
 
   if (mode === "air") {
     return `<svg ${common}>
-      <path d="M12 1.5L13.4 8.5L21.5 11.5L13.6 12.6L14.8 21L12 18.2L9.2 21L10.4 12.6L2.5 11.5L10.6 8.5L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+      <path d="M12 1L13.6 9L22 12L13.6 13.2L14.8 22L12 19.5L9.2 22L10.4 13.2L2 12L10.4 9L12 1Z" fill="${color}" stroke="white" stroke-width="1"/>
     </svg>`;
   }
 
   if (mode === "sea") {
     return `<svg ${common}>
-      <path d="M12 2L15.2 10.5H8.8L12 2Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
-      <rect x="10" y="10.5" width="4" height="6" fill="${color}" stroke="white" stroke-width="0.75"/>
-      <path d="M3.5 18C6 20.3 9 21.5 12 21.5C15 21.5 18 20.3 20.5 18L18.5 15.8H5.5L3.5 18Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
+      <path d="M12 1.5L15.5 10.5H8.5L12 1.5Z" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+      <rect x="9.5" y="10.5" width="5" height="7" fill="${color}" stroke="white" stroke-width="1"/>
+      <path d="M2.5 19C5.5 21.7 9 23 12 23C15 23 18.5 21.7 21.5 19L19 16H5L2.5 19Z" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/>
     </svg>`;
   }
 
   return `<svg ${common}>
-    <path d="M12 1.5L15 8.5H9L12 1.5Z" fill="${color}" stroke="white" stroke-width="0.75" stroke-linejoin="round"/>
-    <rect x="7.5" y="8.5" width="9" height="10.5" rx="1.5" fill="${color}" stroke="white" stroke-width="0.75"/>
-    <circle cx="9.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
-    <circle cx="14.5" cy="20.5" r="1.6" fill="${color}" stroke="white" stroke-width="0.75"/>
+    <path d="M12 1L15.5 9H8.5L12 1Z" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+    <rect x="6.5" y="9" width="11" height="11.5" rx="1.5" fill="${color}" stroke="white" stroke-width="1"/>
+    <circle cx="9" cy="21.5" r="1.8" fill="${color}" stroke="white" stroke-width="1"/>
+    <circle cx="15" cy="21.5" r="1.8" fill="${color}" stroke="white" stroke-width="1"/>
   </svg>`;
 }
+
+const MODE_COLORS: Record<TransportMode, string> = {
+  land: "#ef4444",
+  air: "#3b82f6",
+  sea: "#92400e",
+};
 
 // Customs = amber shield with checkmark. Checkpoint = gray flag.
 function checkpointSvg(type: "customs" | "checkpoint"): string {
@@ -111,6 +122,7 @@ function checkpointSvg(type: "customs" | "checkpoint"): string {
 const CARTO_KEY = "cb1_3uok_1_f6d3991685906b9cf3d2e547";
 const CARTO_TILES =
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=" + CARTO_KEY;
+const OSM_FALLBACK_TILES = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
 export default function LeafletMap({
   origin,
@@ -129,23 +141,45 @@ export default function LeafletMap({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Validate every point up front — bad/missing lat-lng is dropped rather
+  // than passed into Leaflet, which is what produces a broken/blank map.
+  const validOrigin = origin && isValidCoord(origin.lat, origin.lng) ? origin : null;
+  const validCurrent = current && isValidCoord(current.lat, current.lng) ? current : null;
+  const validDestination = destination && isValidCoord(destination.lat, destination.lng) ? destination : null;
+  const validCheckpoints = checkpoints.filter((c) => isValidCoord(c.lat, c.lng));
+
+  const hasAnyPoint = !!(validOrigin || validCurrent || validDestination);
+
   useEffect(() => {
-    if (!ref.current) return;
+    if (!ref.current || !hasAnyPoint) return;
     ensureStyles();
     const mode = ((transportMode || "land").toLowerCase() as TransportMode);
-    const points = [origin, current, destination].filter(Boolean) as Pt[];
-    if (points.length === 0) return;
+    const points = [validOrigin, validCurrent, validDestination].filter(Boolean) as Pt[];
 
     const map = L.map(ref.current, { zoomControl: true, attributionControl: false }).setView(
       [points[0].lat, points[0].lng],
       4
     );
 
-    L.tileLayer(CARTO_TILES, {
+    const cartoLayer = L.tileLayer(CARTO_TILES, {
       maxZoom: 20,
       subdomains: "abcd",
       attribution: '© OpenStreetMap, © CARTO',
-    }).addTo(map);
+    });
+    cartoLayer.addTo(map);
+
+    // If Carto tiles fail to load (key issue, rate limit, network), fall
+    // back to OpenStreetMap so the map never just goes blank/gray.
+    let fellBack = false;
+    cartoLayer.on("tileerror", () => {
+      if (fellBack) return;
+      fellBack = true;
+      map.removeLayer(cartoLayer);
+      L.tileLayer(OSM_FALLBACK_TILES, {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap",
+      }).addTo(map);
+    });
 
     const isOnHold = (status || "").toLowerCase().includes("hold");
     const colors = {
@@ -154,6 +188,8 @@ export default function LeafletMap({
       destination: "#ef4444",
     } as const;
 
+    // Origin/destination: hover/tap only, not permanent — keeps the map
+    // from being cluttered with overlapping always-on labels.
     const addStaticMarker = (p: Pt, color: string) => {
       const icon = L.divIcon({
         className: "",
@@ -165,40 +201,36 @@ export default function LeafletMap({
         .addTo(map)
         .bindTooltip(
           `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${color}"></span>${p.label}</span>`,
-          { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -10] }
+          { permanent: false, direction: "top", className: "custom-tooltip", offset: [0, -10] }
         );
     };
 
-    if (origin) addStaticMarker(origin, colors.origin);
-    if (destination) addStaticMarker(destination, colors.destination);
+    if (validOrigin) addStaticMarker(validOrigin, colors.origin);
+    if (validDestination) addStaticMarker(validDestination, colors.destination);
 
-    // Checkpoint / customs markers along the route. Tap to see label,
-    // type and note in a popup (kept out of the always-visible tooltip
-    // layer so the map doesn't get cluttered with many stops).
-    checkpoints
-      .filter((c) => c.lat != null && c.lng != null)
-      .forEach((c) => {
-        const ringColor = c.type === "customs" ? "#f59e0b" : "#64748b";
-        const icon = L.divIcon({
-          className: "",
-          html: `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:white;border-radius:9999px;box-shadow:0 1px 4px rgba(0,0,0,0.3);border:2px solid ${ringColor}">${checkpointSvg(c.type)}</div>`,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        });
-        L.marker([c.lat as number, c.lng as number], { icon })
-          .addTo(map)
-          .bindPopup(
-            `<div style="font-family:Inter,sans-serif;font-size:12px;min-width:140px">
-              <div style="font-weight:700;color:${c.type === "customs" ? "#b45309" : "#334155"};text-transform:uppercase;font-size:10px;letter-spacing:0.05em">${c.type}</div>
-              <div style="font-weight:600;margin-top:2px">${c.label}</div>
-              ${c.note ? `<div style="color:#64748b;margin-top:2px">${c.note}</div>` : ""}
-            </div>`
-          );
+    // Checkpoint / customs markers along the route.
+    validCheckpoints.forEach((c) => {
+      const ringColor = c.type === "customs" ? "#f59e0b" : "#64748b";
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:white;border-radius:9999px;box-shadow:0 1px 4px rgba(0,0,0,0.3);border:2px solid ${ringColor}">${checkpointSvg(c.type)}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
       });
+      L.marker([c.lat as number, c.lng as number], { icon })
+        .addTo(map)
+        .bindPopup(
+          `<div style="font-family:Inter,sans-serif;font-size:12px;min-width:140px">
+            <div style="font-weight:700;color:${c.type === "customs" ? "#b45309" : "#334155"};text-transform:uppercase;font-size:10px;letter-spacing:0.05em">${c.type}</div>
+            <div style="font-weight:600;margin-top:2px">${c.label}</div>
+            ${c.note ? `<div style="color:#64748b;margin-top:2px">${c.note}</div>` : ""}
+          </div>`
+        );
+    });
 
     const bearingDeg = (() => {
-      const a = current || origin;
-      const b = destination || current;
+      const a = validCurrent || validOrigin;
+      const b = validDestination || validCurrent;
       if (!a || !b) return 0;
       const dx = b.lng - a.lng;
       const dy = b.lat - a.lat;
@@ -206,13 +238,13 @@ export default function LeafletMap({
       return (rad * 180) / Math.PI;
     })();
 
-    if (origin && destination) {
-      const startMid = current || destination;
-      const completed = curveBetween(origin, startMid, mode);
+    if (validOrigin && validDestination) {
+      const startMid = validCurrent || validDestination;
+      const completed = curveBetween(validOrigin, startMid, mode);
       L.polyline(completed, { color: "#3b82f6", weight: 4, opacity: 0.95 }).addTo(map);
 
-      if (current) {
-        const remaining = curveBetween(current, destination, mode);
+      if (validCurrent) {
+        const remaining = curveBetween(validCurrent, validDestination, mode);
         L.polyline(remaining, {
           color: "#94a3b8",
           weight: 3,
@@ -223,43 +255,65 @@ export default function LeafletMap({
       }
     }
 
-    if (current) {
-      const ringColor = isOnHold ? "#f59e0b" : "#3b82f6";
+    // Current marker: permanent tooltip stays — this is the one label
+    // that should always be visible on the map.
+    if (validCurrent) {
+      const ringColor = isOnHold ? "#f59e0b" : MODE_COLORS[mode] === "#ef4444" && mode !== "land" ? "#3b82f6" : (isOnHold ? "#f59e0b" : MODE_COLORS[mode]);
+      const finalColor = isOnHold ? "#f59e0b" : MODE_COLORS[mode];
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
-      const iconSvg = vehicleSvg(mode, ringColor);
+      const iconSvg = vehicleSvg(mode, finalColor);
       const html = `
-        <div style="position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center">
-          <div class="${ringClass}" style="background:${ringColor}66;"></div>
-          <div style="position:relative;width:14px;height:14px;background:${ringColor};border:3px solid white;border-radius:9999px;box-shadow:0 0 0 2px ${ringColor}88;"></div>
-          <div style="position:absolute;left:50%;top:-24px;transform:translateX(-50%) rotate(${bearingDeg}deg);transform-origin:50% 100%;width:24px;height:24px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));pointer-events:none">${iconSvg}</div>
+        <div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center">
+          <div class="${ringClass}" style="background:${finalColor}66;"></div>
+          <div style="position:relative;width:14px;height:14px;background:${finalColor};border:3px solid white;border-radius:9999px;box-shadow:0 0 0 2px ${finalColor}88;"></div>
+          <div style="position:absolute;left:50%;top:-26px;transform:translateX(-50%) rotate(${bearingDeg}deg);transform-origin:50% 100%;width:28px;height:28px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));pointer-events:none">${iconSvg}</div>
         </div>`;
       const icon = L.divIcon({
         className: "",
         html,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
       });
-      L.marker([current.lat, current.lng], { icon, interactive: false, keyboard: false })
+      L.marker([validCurrent.lat, validCurrent.lng], { icon, interactive: false, keyboard: false })
         .addTo(map)
         .bindTooltip(
-          `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${ringColor}"></span>${current.label}</span>`,
-          { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -22] }
+          `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${finalColor}"></span>${validCurrent.label}</span>`,
+          { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -26] }
         );
     }
 
     const boundsPoints = [
       ...points,
-      ...checkpoints.filter((c) => c.lat != null && c.lng != null).map((c) => ({ lat: c.lat as number, lng: c.lng as number })),
+      ...validCheckpoints.map((c) => ({ lat: c.lat as number, lng: c.lng as number })),
     ];
     const group = L.featureGroup(boundsPoints.map((p) => L.marker([p.lat, p.lng])));
-    map.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 6 });
+    map.fitBounds(group.getBounds(), { padding: [24, 24], maxZoom: 10 });
+
+    // Leaflet sometimes measures its container before layout has settled
+    // (flex/grid parents, initial mount) — a short delayed invalidateSize
+    // fixes gray/cropped tiles without needing manual refresh.
+    const t = setTimeout(() => map.invalidateSize(), 200);
 
     return () => {
+      clearTimeout(t);
       map.remove();
     };
-  }, [origin, current, destination, transportMode, status, checkpoints]);
+  }, [validOrigin, validCurrent, validDestination, transportMode, status, checkpoints, hasAnyPoint]);
 
-  return <div ref={ref} className="w-full h-[420px] overflow-hidden" />;
+  if (!hasAnyPoint) {
+    return (
+      <div className="w-full h-[240px] sm:h-[320px] md:h-[420px] flex items-center justify-center bg-[#e8eef3] text-sm text-muted-foreground px-6 text-center">
+        Location data not available for this shipment.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="w-full h-[240px] sm:h-[320px] md:h-[420px] overflow-hidden bg-[#e8eef3]"
+    />
+  );
 }
 
 // Legend shown under the map — only renders the rows that are actually
@@ -269,7 +323,7 @@ export function MapLegend({ checkpoints = [] }: { checkpoints?: Checkpoint[] }) 
   const hasCustoms = checkpoints.some((c) => c.type === "customs");
   const hasCheckpoint = checkpoints.some((c) => c.type === "checkpoint");
   return (
-    <div className="flex flex-wrap items-center gap-4 px-4 py-2 text-xs text-muted-foreground border-t border-border bg-secondary/50">
+    <div className="flex flex-wrap items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 text-[11px] sm:text-xs text-muted-foreground border-t border-border bg-secondary/50">
       <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" /> Origin</div>
       <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Destination</div>
       <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Current</div>
