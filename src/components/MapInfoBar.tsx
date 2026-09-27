@@ -1,7 +1,10 @@
 export type TransportMode = "land" | "air" | "sea";
 
+// Same color set as LeafletMap.tsx — keep both in sync if you ever change
+// a mode's color, or better yet, import MODE_COLORS from LeafletMap.tsx
+// directly if your bundler/project structure allows a shared constants file.
 const MODE_COLORS: Record<TransportMode, string> = {
-  land: "#ef4444",
+  land: "#f97316",
   air: "#3b82f6",
   sea: "#92400e",
 };
