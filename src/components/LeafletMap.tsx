@@ -68,40 +68,47 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
-// Filled vehicle silhouettes, drawn nose UP (north) so the existing
-// rotate(${bearingDeg}deg) wrapper still points them along the route.
-// Default fill by mode: land=red, air=blue, sea=brown. Hold state
-// overrides to amber regardless of mode (handled by caller passing color).
-function vehicleSvg(mode: TransportMode, color: string): string {
-  const common = `width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
-
-  if (mode === "air") {
-    return `<svg ${common}>
-      <path d="M12 1L13.6 9L22 12L13.6 13.2L14.8 22L12 19.5L9.2 22L10.4 13.2L2 12L10.4 9L12 1Z" fill="${color}" stroke="white" stroke-width="1"/>
-    </svg>`;
-  }
-
-  if (mode === "sea") {
-    return `<svg ${common}>
-      <path d="M12 1.5L15.5 10.5H8.5L12 1.5Z" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/>
-      <rect x="9.5" y="10.5" width="5" height="7" fill="${color}" stroke="white" stroke-width="1"/>
-      <path d="M2.5 19C5.5 21.7 9 23 12 23C15 23 18.5 21.7 21.5 19L19 16H5L2.5 19Z" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/>
-    </svg>`;
-  }
-
-  return `<svg ${common}>
-    <path d="M12 1L15.5 9H8.5L12 1Z" fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"/>
-    <rect x="6.5" y="9" width="11" height="11.5" rx="1.5" fill="${color}" stroke="white" stroke-width="1"/>
-    <circle cx="9" cy="21.5" r="1.8" fill="${color}" stroke="white" stroke-width="1"/>
-    <circle cx="15" cy="21.5" r="1.8" fill="${color}" stroke="white" stroke-width="1"/>
-  </svg>`;
-}
-
 const MODE_COLORS: Record<TransportMode, string> = {
   land: "#ef4444",
   air: "#3b82f6",
   sea: "#92400e",
 };
+
+// Standalone filled icons, drawn facing RIGHT by default — no location pin.
+// Plane: top-down artwork, rotated 90deg in the SVG itself so it faces
+// right at rest. Truck/Ship: side-view artwork, already facing right.
+function vehicleSvg(mode: TransportMode, color: string): string {
+  const s = `width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
+
+  if (mode === "air") {
+    return `<svg ${s}>
+      <g transform="rotate(90 12 12)">
+        <path fill="${color}" stroke="white" stroke-width="1"
+          d="M12 2.5c.4 0 .8.2 1 .5l1.2 2.3 6.3 1.7c.7.2 1 1 .5 1.5l-4.8 4.2 1.5 6.5c.2.7-.5 1.3-1.1.9L12 17.3l-4.6 2.8c-.6.4-1.3-.2-1.1-.9l1.5-6.5-4.8-4.2c-.5-.5-.2-1.3.5-1.5l6.3-1.7L11 3c.2-.3.6-.5 1-.5z"/>
+      </g>
+    </svg>`;
+  }
+
+  if (mode === "sea") {
+    return `<svg ${s}>
+      <path fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"
+        d="M3 14h17l-1.5 3.5H5.5L3 14z"/>
+      <path fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"
+        d="M6 14V9h3v5M10 14V7h5l2 3v4"/>
+      <path fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round"
+        d="M4 18.5c1.5 1 3 1.5 5 1.5s3.5-.5 5-1.5 3-1.5 5-1.5"/>
+    </svg>`;
+  }
+
+  return `<svg ${s}>
+    <rect x="2" y="8" width="12" height="7" rx="1" fill="${color}" stroke="white" stroke-width="1"/>
+    <path fill="${color}" stroke="white" stroke-width="1" stroke-linejoin="round"
+      d="M14 10h4l3 3v2h-7V10z"/>
+    <circle cx="6.5" cy="16.5" r="1.8" fill="${color}" stroke="white" stroke-width="1"/>
+    <circle cx="16.5" cy="16.5" r="1.8" fill="${color}" stroke="white" stroke-width="1"/>
+    <rect x="15" y="11" width="2.5" height="2" fill="white" opacity="0.9"/>
+  </svg>`;
+}
 
 // Customs = amber shield with checkmark. Checkpoint = gray flag.
 function checkpointSvg(type: "customs" | "checkpoint"): string {
@@ -141,8 +148,6 @@ export default function LeafletMap({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // Validate every point up front — bad/missing lat-lng is dropped rather
-  // than passed into Leaflet, which is what produces a broken/blank map.
   const validOrigin = origin && isValidCoord(origin.lat, origin.lng) ? origin : null;
   const validCurrent = current && isValidCoord(current.lat, current.lng) ? current : null;
   const validDestination = destination && isValidCoord(destination.lat, destination.lng) ? destination : null;
@@ -168,8 +173,6 @@ export default function LeafletMap({
     });
     cartoLayer.addTo(map);
 
-    // If Carto tiles fail to load (key issue, rate limit, network), fall
-    // back to OpenStreetMap so the map never just goes blank/gray.
     let fellBack = false;
     cartoLayer.on("tileerror", () => {
       if (fellBack) return;
@@ -188,8 +191,6 @@ export default function LeafletMap({
       destination: "#ef4444",
     } as const;
 
-    // Origin/destination: hover/tap only, not permanent — keeps the map
-    // from being cluttered with overlapping always-on labels.
     const addStaticMarker = (p: Pt, color: string) => {
       const icon = L.divIcon({
         className: "",
@@ -208,7 +209,6 @@ export default function LeafletMap({
     if (validOrigin) addStaticMarker(validOrigin, colors.origin);
     if (validDestination) addStaticMarker(validDestination, colors.destination);
 
-    // Checkpoint / customs markers along the route.
     validCheckpoints.forEach((c) => {
       const ringColor = c.type === "customs" ? "#f59e0b" : "#64748b";
       const icon = L.divIcon({
@@ -228,15 +228,15 @@ export default function LeafletMap({
         );
     });
 
-    const bearingDeg = (() => {
-      const a = validCurrent || validOrigin;
-      const b = validDestination || validCurrent;
-      if (!a || !b) return 0;
-      const dx = b.lng - a.lng;
-      const dy = b.lat - a.lat;
-      const rad = Math.atan2(dx, dy);
-      return (rad * 180) / Math.PI;
-    })();
+    // Direction toward destination. Plane (top-down art) rotates using the
+    // full compass bearing; truck/ship (side-view art, drawn facing right
+    // at rest) only mirror horizontally when travel is westbound.
+    const a = validCurrent || validOrigin;
+    const b = validDestination || validCurrent;
+    const dx = a && b ? b.lng - a.lng : 0;
+    const dy = a && b ? b.lat - a.lat : 0;
+    const bearingDeg = a && b ? (Math.atan2(dx, dy) * 180) / Math.PI : 0;
+    const headingWest = dx < 0;
 
     if (validOrigin && validDestination) {
       const startMid = validCurrent || validDestination;
@@ -255,18 +255,25 @@ export default function LeafletMap({
       }
     }
 
-    // Current marker: permanent tooltip stays — this is the one label
-    // that should always be visible on the map.
     if (validCurrent) {
-      const ringColor = isOnHold ? "#f59e0b" : MODE_COLORS[mode] === "#ef4444" && mode !== "land" ? "#3b82f6" : (isOnHold ? "#f59e0b" : MODE_COLORS[mode]);
       const finalColor = isOnHold ? "#f59e0b" : MODE_COLORS[mode];
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
       const iconSvg = vehicleSvg(mode, finalColor);
+      // Plane artwork faces right at rest and needs the compass bearing,
+      // adjusted by -90deg since "right" (east) is bearing 90.
+      // Truck/ship artwork faces right at rest and just mirrors on X when
+      // heading west — no rotation, so the vehicle body stays upright.
+      const transform =
+        mode === "air"
+          ? `rotate(${bearingDeg - 90}deg)`
+          : `scaleX(${headingWest ? -1 : 1})`;
       const html = `
         <div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center">
           <div class="${ringClass}" style="background:${finalColor}66;"></div>
           <div style="position:relative;width:14px;height:14px;background:${finalColor};border:3px solid white;border-radius:9999px;box-shadow:0 0 0 2px ${finalColor}88;"></div>
-          <div style="position:absolute;left:50%;top:-26px;transform:translateX(-50%) rotate(${bearingDeg}deg);transform-origin:50% 100%;width:28px;height:28px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));pointer-events:none">${iconSvg}</div>
+          <div style="position:absolute;left:50%;top:-30px;transform:translateX(-50%);width:32px;height:32px;pointer-events:none">
+            <div style="width:100%;height:100%;transform:${transform};filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35))">${iconSvg}</div>
+          </div>
         </div>`;
       const icon = L.divIcon({
         className: "",
@@ -278,7 +285,7 @@ export default function LeafletMap({
         .addTo(map)
         .bindTooltip(
           `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${finalColor}"></span>${validCurrent.label}</span>`,
-          { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -26] }
+          { permanent: true, direction: "top", className: "custom-tooltip", offset: [0, -30] }
         );
     }
 
@@ -289,9 +296,6 @@ export default function LeafletMap({
     const group = L.featureGroup(boundsPoints.map((p) => L.marker([p.lat, p.lng])));
     map.fitBounds(group.getBounds(), { padding: [24, 24], maxZoom: 10 });
 
-    // Leaflet sometimes measures its container before layout has settled
-    // (flex/grid parents, initial mount) — a short delayed invalidateSize
-    // fixes gray/cropped tiles without needing manual refresh.
     const t = setTimeout(() => map.invalidateSize(), 200);
 
     return () => {
@@ -316,9 +320,6 @@ export default function LeafletMap({
   );
 }
 
-// Legend shown under the map — only renders the rows that are actually
-// relevant to this shipment (customs/checkpoint rows only appear if the
-// shipment has at least one of that type).
 export function MapLegend({ checkpoints = [] }: { checkpoints?: Checkpoint[] }) {
   const hasCustoms = checkpoints.some((c) => c.type === "customs");
   const hasCheckpoint = checkpoints.some((c) => c.type === "checkpoint");
