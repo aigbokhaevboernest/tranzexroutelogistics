@@ -1,5 +1,12 @@
 export type TransportMode = "land" | "air" | "sea";
 
+const MODE_COLORS: Record<TransportMode, string> = {
+  land: "#ef4444",
+  air: "#3b82f6",
+  sea: "#92400e",
+};
+const HOLD_COLOR = "#f59e0b";
+
 /** Clean icons facing RIGHT (toward destination) — no emoji */
 function ModeIcon({ mode }: { mode: TransportMode }) {
   const common = {
@@ -47,6 +54,7 @@ export default function MapInfoBar({
   current,
   destination,
   transportMode = "land",
+  status,
   currentStopIndex = 0,
   totalStops = 1,
 }: {
@@ -54,24 +62,33 @@ export default function MapInfoBar({
   current?: string;
   destination?: string;
   transportMode?: string;
+  status?: string;
   currentStopIndex?: number;
   totalStops?: number;
 }) {
   const mode = ((transportMode || "land").toLowerCase() as TransportMode);
-  const pct =
-    totalStops > 1
-      ? Math.min(100, Math.max(0, (currentStopIndex / (totalStops - 1)) * 100))
-      : 0;
+  const isOnHold = (status || "").toLowerCase().includes("hold");
+  const currentColor = isOnHold ? HOLD_COLOR : MODE_COLORS[mode];
+
+  // Progress bar fix: a single-stop journey (e.g. only "Delivered" is
+  // visible) should read as complete rather than stuck at 0%. For
+  // multi-stop journeys, clamp the index into range before dividing so a
+  // stale/out-of-range index can't push the bar past 100% or negative.
+  const pct = (() => {
+    if (totalStops <= 1) return currentStopIndex >= 0 ? 100 : 0;
+    const clampedIndex = Math.min(Math.max(currentStopIndex, 0), totalStops - 1);
+    return Math.min(100, Math.max(0, (clampedIndex / (totalStops - 1)) * 100));
+  })();
 
   const stops = [
     { color: "#22c55e", role: "Origin", name: origin },
-    { color: "#3b82f6", role: "Current Stop", name: current },
+    { color: currentColor, role: "Current Stop", name: current },
     { color: "#ef4444", role: "Destination", name: destination },
   ];
 
   return (
     <div className="bg-navy-deep text-white p-3 space-y-3">
-      {/* Top row: city ····· city ····· city — always one line, even on mobile */}
+      {/* Top row: Origin ····· Current ····· Destination — always one line */}
       <div className="flex items-start justify-between gap-1 overflow-x-auto">
         {stops.map((s, i) => (
           <div key={s.role} className="flex items-center min-w-0 flex-1">
@@ -109,8 +126,8 @@ export default function MapInfoBar({
         </div>
         <div className="relative h-1.5 w-full bg-white/15 rounded-full overflow-hidden">
           <div
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-400 via-sky-400 to-rose-400 transition-all duration-500"
-            style={{ width: `${pct}%` }}
+            className="absolute inset-y-0 left-0 transition-all duration-500"
+            style={{ width: `${pct}%`, background: `linear-gradient(90deg, #22c55e, ${currentColor}, #ef4444)` }}
           />
         </div>
         <div className="mt-1 text-[10px] text-white/60 text-center truncate">
