@@ -1,10 +1,7 @@
 export type TransportMode = "land" | "air" | "sea";
 
-// Same color set as LeafletMap.tsx — keep both in sync if you ever change
-// a mode's color, or better yet, import MODE_COLORS from LeafletMap.tsx
-// directly if your bundler/project structure allows a shared constants file.
 const MODE_COLORS: Record<TransportMode, string> = {
-  land: "#f97316",
+  land: "#7c3aed",
   air: "#3b82f6",
   sea: "#92400e",
 };
@@ -13,15 +10,14 @@ const HOLD_COLOR = "#f59e0b";
 /** Clean icons facing RIGHT (toward destination) — no emoji */
 function ModeIcon({ mode }: { mode: TransportMode }) {
   const common = {
-    width: 18,
-    height: 18,
+    width: 14,
+    height: 14,
     viewBox: "0 0 24 24",
     fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.75,
+    stroke: "white",
+    strokeWidth: 1.9,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
-    className: "text-white/90",
   };
 
   if (mode === "air") {
@@ -73,10 +69,9 @@ export default function MapInfoBar({
   const isOnHold = (status || "").toLowerCase().includes("hold");
   const currentColor = isOnHold ? HOLD_COLOR : MODE_COLORS[mode];
 
-  // Progress bar fix: a single-stop journey (e.g. only "Delivered" is
-  // visible) should read as complete rather than stuck at 0%. For
-  // multi-stop journeys, clamp the index into range before dividing so a
-  // stale/out-of-range index can't push the bar past 100% or negative.
+  // Progress bar: a single-stop journey (e.g. only "Delivered" visible)
+  // reads as complete rather than stuck at 0%. Index is clamped so a
+  // stale/out-of-range value can't push the bar past 100% or negative.
   const pct = (() => {
     if (totalStops <= 1) return currentStopIndex >= 0 ? 100 : 0;
     const clampedIndex = Math.min(Math.max(currentStopIndex, 0), totalStops - 1);
@@ -118,23 +113,34 @@ export default function MapInfoBar({
         ))}
       </div>
 
-      {/* Progress bar row — clean icon facing right, no emoji */}
-      <div className="px-0.5 pb-0.5">
-        <div className="flex items-center justify-between text-[9px] sm:text-[10px] uppercase tracking-widest text-white/60 mb-1 gap-2">
-          <span className="truncate">{origin || "Origin"}</span>
-          <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-white/10">
-            <ModeIcon mode={mode} />
-          </span>
-          <span className="truncate text-right">{destination || "Destination"}</span>
+      {/* Progress bar row — icon + current-stop label both slide along
+          the bar at `pct`, instead of sitting fixed in the center */}
+      <div className="relative pt-1 pb-9">
+        <div className="flex items-center justify-between text-[9px] sm:text-[10px] uppercase tracking-widest text-white/50 mb-1.5">
+          <span className="truncate max-w-[38%]">{origin || "Origin"}</span>
+          <span className="truncate max-w-[38%] text-right">{destination || "Destination"}</span>
         </div>
+
         <div className="relative h-1.5 w-full bg-white/15 rounded-full overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 transition-all duration-500"
             style={{ width: `${pct}%`, background: `linear-gradient(90deg, #22c55e, ${currentColor}, #ef4444)` }}
           />
         </div>
-        <div className="mt-1 text-[10px] text-white/60 text-center truncate">
-          {current || "—"}
+
+        <div
+          className="absolute top-[26px] flex flex-col items-center transition-all duration-500"
+          style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+        >
+          <span
+            className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-white/20 shrink-0"
+            style={{ background: currentColor }}
+          >
+            <ModeIcon mode={mode} />
+          </span>
+          <span className="mt-1 text-[9px] font-semibold text-white/80 whitespace-nowrap max-w-[110px] truncate text-center">
+            {current || "—"}
+          </span>
         </div>
       </div>
     </div>
