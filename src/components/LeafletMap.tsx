@@ -163,8 +163,6 @@ export const MODE_COLORS: Record<TransportMode, string> = {
 };
 export const HOLD_COLOR = "#f59e0b";
 
-const LAND_FIXED_ZOOM = 12;
-
 // Standalone filled icons, drawn facing RIGHT by default — no location pin.
 function vehicleSvg(mode: TransportMode, color: string): string {
   const s = `width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
@@ -477,22 +475,18 @@ export default function LeafletMap({
         );
     }
 
-    // --- Camera: fixed zoom for land, fit-to-bounds for air/sea ---
-    if (mode === "land") {
-      const center = markerPoint || (validOrigin && validDestination ? midpoint(validOrigin, validDestination) : points[0]);
-      map.setView([center.lat, center.lng], LAND_FIXED_ZOOM);
-    } else {
-      const boundsPoints = [
-        ...(validOrigin ? [validOrigin] : []),
-        ...(validDestination ? [validDestination] : []),
-        ...(markerPoint ? [markerPoint] : []),
-        ...validCheckpoints.map((c) => ({ lat: c.lat as number, lng: c.lng as number })),
-      ];
-      if (boundsPoints.length) {
-        const group = L.featureGroup(boundsPoints.map((p) => L.marker([p.lat, p.lng])));
-        map.fitBounds(group.getBounds(), { padding: [24, 24], maxZoom: 10 });
-      }
+        // --- Camera: fit-to-bounds for all modes, same as before ---
+    const boundsPoints = [
+      ...(validOrigin ? [validOrigin] : []),
+      ...(validDestination ? [validDestination] : []),
+      ...(markerPoint ? [markerPoint] : []),
+      ...validCheckpoints.map((c) => ({ lat: c.lat as number, lng: c.lng as number })),
+    ];
+    if (boundsPoints.length) {
+      const group = L.featureGroup(boundsPoints.map((p) => L.marker([p.lat, p.lng])));
+      map.fitBounds(group.getBounds(), { padding: [24, 24], maxZoom: 10 });
     }
+
 
     const t = setTimeout(() => map.invalidateSize(), 200);
 
