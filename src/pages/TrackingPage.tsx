@@ -438,14 +438,16 @@ export default function TrackingPage() {
                   currentStopIndex={getCurrentStopIndex(s.status, s.transport_mode)}
                   totalStops={getVisibleSteps(s.transport_mode, s.status).length}
                 />
-                <LeafletMap
+                                <LeafletMap
                   origin={origin}
                   current={current}
                   destination={destination}
                   transportMode={s.transport_mode}
                   status={s.status}
                   checkpoints={s.checkpoints ?? []}
+                  currentLabel={s.current_stop_label || s.current_location}
                 />
+
                 <MapLegend checkpoints={s.checkpoints ?? []} />
               </div>
 
