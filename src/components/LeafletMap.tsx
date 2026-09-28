@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
+import { airSeaProgressPercent } from "@/lib/geo";
 
 type Pt = { lat: number; lng: number; label: string };
 export type TransportMode = "land" | "air" | "sea";
@@ -15,12 +16,6 @@ function isValidCoord(lat: any, lng: any): boolean {
   return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
 }
 
-function midpoint(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  return { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 };
-}
-
-// Land-only fallback: a plain straight line shown instantly while the real
-// road route loads from OSRM (see fetchRoadRoute below).
 function straightLine(a: { lat: number; lng: number }, b: { lat: number; lng: number }): [number, number][] {
   return [[a.lat, a.lng], [b.lat, b.lng]];
 }
@@ -28,8 +23,8 @@ function straightLine(a: { lat: number; lng: number }, b: { lat: number; lng: nu
 // Computes the quadratic-bezier control point for an air/sea route. The
 // perpendicular offset direction is normalized so the curve always bows
 // the same way (toward increasing latitude) regardless of whether the
-// route runs east or west — this is what keeps the completed/remaining
-// segments visually consistent instead of one bowing up and the other down.
+// route runs east or west — this keeps the completed/remaining segments
+// visually consistent instead of one bowing up and the other down.
 function curveControlPoint(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
@@ -51,7 +46,6 @@ function curveControlPoint(
   };
 }
 
-// Full discretized curve from a to b, used for drawing the polyline.
 function buildCurve(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
@@ -71,8 +65,10 @@ function buildCurve(
 
 // Fetches a real road-following route for land mode from OSRM's free
 // public routing server (no API key required). Returns null on any
-// failure/timeout so the caller falls back to a straight line, meaning
-// the map never breaks even if OSRM is briefly unavailable.
+// failure/timeout so the caller falls back to a straight line — the map
+// never breaks even if OSRM is briefly unavailable. This only ever runs
+// for land; air/sea always use the curved great-circle-style path, never
+// a road route.
 async function fetchRoadRoute(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number }
@@ -92,22 +88,6 @@ async function fetchRoadRoute(
     console.warn("OSRM road route failed, using straight-line fallback:", err);
     return null;
   }
-}
-
-// Maps a status string to how far along the route (0 = origin, 1 =
-// destination) the current position should sit, for air/sea modes. This
-// replaces admin-entered coordinates for the current marker on those
-// modes — position is fully derived from status, coordinates aren't used.
-function progressTForStatus(status: string | undefined, mode: "air" | "sea"): number {
-  const s = (status || "").toLowerCase();
-  if (s.includes("origin")) return 0;
-  if (s.includes("depart")) return 0.25;
-  if (mode === "air" && s.includes("flight")) return 0.5;
-  if (mode === "sea" && s.includes("sea")) return 0.5;
-  if (s.includes("hold")) return 0.5;
-  if (s.includes("arrived")) return 1;
-  if (s.includes("pick") || s.includes("deliver")) return 1;
-  return 0.5;
 }
 
 // Inject pulse keyframes + tooltip/hint styles once
@@ -153,9 +133,10 @@ function ensureStyles() {
 }
 
 // Single source of truth for mode color — the pulsing ring, the vehicle
-// silhouette inside it, MapInfoBar's "Current Stop" dot, and MapLegend's
-// "Current" dot all read from this same map, so they always stay in sync.
-// Hold status overrides all of them to amber regardless of mode.
+// silhouette inside it, MapInfoBar's "Current Stop" marker, and
+// MapLegend's "Current" dot all read from this same map, so they always
+// stay in sync. Hold status overrides all of them to amber regardless of
+// mode.
 export const MODE_COLORS: Record<TransportMode, string> = {
   land: "#7c3aed",
   air: "#3b82f6",
@@ -163,7 +144,6 @@ export const MODE_COLORS: Record<TransportMode, string> = {
 };
 export const HOLD_COLOR = "#f59e0b";
 
-// Standalone filled icons, drawn facing RIGHT by default — no location pin.
 function vehicleSvg(mode: TransportMode, color: string): string {
   const s = `width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
 
@@ -197,7 +177,6 @@ function vehicleSvg(mode: TransportMode, color: string): string {
   </svg>`;
 }
 
-// Customs = amber shield with checkmark. Checkpoint = gray flag.
 function checkpointSvg(type: "customs" | "checkpoint"): string {
   if (type === "customs") {
     return `<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -247,9 +226,6 @@ export default function LeafletMap({
   const validCheckpoints = checkpoints.filter((c) => isValidCoord(c.lat, c.lng));
 
   const mode = ((transportMode || "land").toLowerCase() as TransportMode);
-  // Air/sea can show a marker from origin/destination + status alone, even
-  // with no coordinates on the "current" field — land still needs a real
-  // point somewhere to draw anything.
   const hasAnyPoint = !!(
     validOrigin ||
     validCurrent ||
@@ -267,7 +243,7 @@ export default function LeafletMap({
     const map = L.map(ref.current, {
       zoomControl: true,
       attributionControl: false,
-      scrollWheelZoom: false, // prevent page-scroll from being hijacked by the map
+      scrollWheelZoom: false,
     }).setView([points[0].lat, points[0].lng], 4);
 
     const cartoLayer = L.tileLayer(CARTO_TILES, {
@@ -335,10 +311,7 @@ export default function LeafletMap({
     }
 
     const isOnHold = (status || "").toLowerCase().includes("hold");
-    const colors = {
-      origin: "#22c55e",
-      destination: "#ef4444",
-    } as const;
+    const colors = { origin: "#22c55e", destination: "#ef4444" } as const;
 
     const addStaticMarker = (p: Pt, color: string) => {
       const icon = L.divIcon({
@@ -377,15 +350,13 @@ export default function LeafletMap({
         );
     });
 
-    // --- Route lines + current position ---
     let markerPoint: { lat: number; lng: number } | null = null;
     let headingWest = false;
     let bearingDeg = 0;
 
     if (mode === "land") {
-      // Land: real road-following route via OSRM, current marker at the
-      // admin-set coordinates (unchanged — land current still uses real
-      // coordinates for accurate road routing).
+      // Land: real road-following route via OSRM. Current marker sits at
+      // the admin-set coordinates, unchanged.
       if (validOrigin && validDestination) {
         const startMid = validCurrent || validDestination;
 
@@ -416,27 +387,22 @@ export default function LeafletMap({
         markerPoint = { lat: validCurrent.lat, lng: validCurrent.lng };
         const a = validCurrent || validOrigin;
         const b = validDestination || validCurrent;
-        if (a && b) {
-          const dx = b.lng - a.lng;
-          headingWest = dx < 0;
-        }
+        if (a && b) headingWest = b.lng - a.lng < 0;
       }
     } else if (validOrigin && validDestination) {
-      // Air/sea: one continuous curve from origin to destination. The
-      // current position is computed from status alone (0%/25%/50%/100%)
-      // — admin-entered "current" coordinates are not used for placement
-      // here, only its label text is (via currentLabel prop).
-      const t = progressTForStatus(status, mode as "air" | "sea");
+      // Air/sea: one continuous curve, current position computed purely
+      // from status (0/25/50/100%) — admin-entered "current" coordinates
+      // are never used for placement here, only its label text is.
+      const pct = airSeaProgressPercent(status, mode as "air" | "sea");
+      const t = pct / 100;
       const fullCurve = buildCurve(validOrigin, validDestination, mode as "air" | "sea", 120);
       const splitIdx = Math.max(0, Math.min(fullCurve.length - 1, Math.round(t * (fullCurve.length - 1))));
 
       if (splitIdx > 0) {
-        const completed = fullCurve.slice(0, splitIdx + 1);
-        L.polyline(completed, { color: "#3b82f6", weight: 4, opacity: 0.95 }).addTo(map);
+        L.polyline(fullCurve.slice(0, splitIdx + 1), { color: "#3b82f6", weight: 4, opacity: 0.95 }).addTo(map);
       }
       if (splitIdx < fullCurve.length - 1) {
-        const remaining = fullCurve.slice(splitIdx);
-        L.polyline(remaining, {
+        L.polyline(fullCurve.slice(splitIdx), {
           color: "#94a3b8", weight: 3, opacity: 0.75, dashArray: "8 10", className: "route-dash",
         }).addTo(map);
       }
@@ -449,15 +415,16 @@ export default function LeafletMap({
       headingWest = dx < 0;
     }
 
-    // Current marker: ring/dot AND vehicle icon both follow the mode
-    // color (purple land / blue air / brown sea, amber on hold).
     if (markerPoint) {
       const ringColor = isOnHold ? HOLD_COLOR : MODE_COLORS[mode];
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
       const iconSvg = vehicleSvg(mode, ringColor);
       const transform =
         mode === "air" ? `rotate(${bearingDeg - 90}deg)` : `scaleX(${headingWest ? -1 : 1})`;
-      const label = mode === "land" ? (validCurrent?.label || currentLabel || "Current") : (currentLabel || validCurrent?.label || "Current");
+      const label =
+        mode === "land"
+          ? validCurrent?.label || currentLabel || "Current"
+          : currentLabel || validCurrent?.label || "Current";
       const html = `
         <div style="position:relative;width:42px;height:42px;display:flex;align-items:center;justify-content:center">
           <div class="${ringClass}" style="background:${ringColor}66;"></div>
@@ -475,7 +442,6 @@ export default function LeafletMap({
         );
     }
 
-        // --- Camera: fit-to-bounds for all modes, same as before ---
     const boundsPoints = [
       ...(validOrigin ? [validOrigin] : []),
       ...(validDestination ? [validDestination] : []),
@@ -486,7 +452,6 @@ export default function LeafletMap({
       const group = L.featureGroup(boundsPoints.map((p) => L.marker([p.lat, p.lng])));
       map.fitBounds(group.getBounds(), { padding: [24, 24], maxZoom: 10 });
     }
-
 
     const t = setTimeout(() => map.invalidateSize(), 200);
 
