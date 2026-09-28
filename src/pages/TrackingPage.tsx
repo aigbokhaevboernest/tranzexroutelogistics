@@ -21,6 +21,7 @@ import PaymentModal from "@/components/PaymentModal";
 import PrintInvoice from "@/components/PrintInvoice";
 import ShipmentHistory from "@/components/ShipmentHistory";
 import trackingHero from "@/assets/tracking-hero.jpg";
+import { landProgressPercent, airSeaProgressPercent, formatPortLabel } from "@/lib/geo";
 
 const COMPANY = {
   name: "Tranzex Route Logistics",
@@ -85,6 +86,7 @@ export default function TrackingPage() {
         .select(`
           id, tracking_number, status, current_location, amount_due,
           expected_delivery_date, date_sent, origin_label, destination_label,
+          origin_code, destination_code,
           origin_lat, origin_lng, destination_lat, destination_lng,
           current_stop_lat, current_stop_lng, current_stop_label,
           package_type, weight, description, comments,
@@ -149,9 +151,20 @@ export default function TrackingPage() {
     return TRANSPORT_META[key] || null;
   }, [s?.transport_mode]);
 
+  const mode = (s?.transport_mode || "land").toLowerCase();
+
+  // Land shows the plain place name; air/sea show "CODE (Name)" using the
+  // IATA/UN-LOCODE the admin entered plus the airport/seaport name.
+  const originDisplay = mode === "land"
+    ? (s?.origin_label || "Origin")
+    : formatPortLabel(s?.origin_code, s?.origin_label);
+  const destinationDisplay = mode === "land"
+    ? (s?.destination_label || "Destination")
+    : formatPortLabel(s?.destination_code, s?.destination_label);
+
   const origin =
     s?.origin_lat != null && s?.origin_lng != null
-      ? { lat: Number(s.origin_lat), lng: Number(s.origin_lng), label: s.origin_label || "Origin" }
+      ? { lat: Number(s.origin_lat), lng: Number(s.origin_lng), label: originDisplay }
       : null;
   const current =
     s?.current_stop_lat != null && s?.current_stop_lng != null
@@ -159,8 +172,17 @@ export default function TrackingPage() {
       : null;
   const destination =
     s?.destination_lat != null && s?.destination_lng != null
-      ? { lat: Number(s.destination_lat), lng: Number(s.destination_lng), label: s.destination_label || "Destination" }
+      ? { lat: Number(s.destination_lat), lng: Number(s.destination_lng), label: destinationDisplay }
       : null;
+
+  // Land: real percentage along the straight-line distance from origin to
+  // current. Air/sea: fixed 0/25/50/100% based on status, since those
+  // modes don't track intermediate coordinates.
+  const progressPercent = useMemo(() => {
+    if (!s) return undefined;
+    if (mode === "land") return landProgressPercent(origin, current, destination);
+    return airSeaProgressPercent(s.status, mode as "air" | "sea");
+  }, [s, mode, origin, current, destination]);
 
   const bankDetailsForModal = s ? [
     s.bank_name,
@@ -361,8 +383,8 @@ export default function TrackingPage() {
                 })()}
 
                 <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                  <Row label="Origin" value={s.origin_label} />
-                  <Row label="Destination" value={s.destination_label} />
+                  <Row label="Origin" value={originDisplay} />
+                  <Row label="Destination" value={destinationDisplay} />
                   <Row label="Type" value={s.package_type} />
                   <Row label="Weight" value={s.weight} />
                   <Row label="Date Sent" value={s.date_sent} />
@@ -431,14 +453,16 @@ export default function TrackingPage() {
               {/* Map */}
               <div className="bg-white rounded-md border border-border overflow-hidden">
                 <MapInfoBar
-                  origin={s.origin_label}
+                  origin={originDisplay}
                   current={s.current_stop_label || s.current_location}
-                  destination={s.destination_label}
+                  destination={destinationDisplay}
                   transportMode={s.transport_mode}
+                  status={s.status}
+                  progressPercent={progressPercent}
                   currentStopIndex={getCurrentStopIndex(s.status, s.transport_mode)}
                   totalStops={getVisibleSteps(s.transport_mode, s.status).length}
                 />
-                                <LeafletMap
+                <LeafletMap
                   origin={origin}
                   current={current}
                   destination={destination}
@@ -447,8 +471,11 @@ export default function TrackingPage() {
                   checkpoints={s.checkpoints ?? []}
                   currentLabel={s.current_stop_label || s.current_location}
                 />
-
-                <MapLegend checkpoints={s.checkpoints ?? []} />
+                <MapLegend
+                  checkpoints={s.checkpoints ?? []}
+                  transportMode={s.transport_mode}
+                  status={s.status}
+                />
               </div>
 
               <div className="text-xs text-muted-foreground text-right">
