@@ -7,7 +7,6 @@ const MODE_COLORS: Record<TransportMode, string> = {
 };
 const HOLD_COLOR = "#f59e0b";
 
-/** Clean icons facing RIGHT (toward destination) — no emoji */
 function ModeIcon({ mode }: { mode: TransportMode }) {
   const common = {
     width: 14,
@@ -54,6 +53,10 @@ export default function MapInfoBar({
   destination,
   transportMode = "land",
   status,
+  /** Exact 0-100 progress percentage, computed by the caller from real
+   * distance (land) or route-position (air/sea). When provided this is
+   * used directly instead of the older step-index approximation. */
+  progressPercent,
   currentStopIndex = 0,
   totalStops = 1,
 }: {
@@ -62,6 +65,7 @@ export default function MapInfoBar({
   destination?: string;
   transportMode?: string;
   status?: string;
+  progressPercent?: number;
   currentStopIndex?: number;
   totalStops?: number;
 }) {
@@ -69,10 +73,12 @@ export default function MapInfoBar({
   const isOnHold = (status || "").toLowerCase().includes("hold");
   const currentColor = isOnHold ? HOLD_COLOR : MODE_COLORS[mode];
 
-  // Progress bar: a single-stop journey (e.g. only "Delivered" visible)
-  // reads as complete rather than stuck at 0%. Index is clamped so a
-  // stale/out-of-range value can't push the bar past 100% or negative.
   const pct = (() => {
+    if (typeof progressPercent === "number" && Number.isFinite(progressPercent)) {
+      return Math.min(100, Math.max(0, progressPercent));
+    }
+    // Fallback for cases with no distance/route data available (e.g. land
+    // shipment with no current-stop coordinates yet).
     if (totalStops <= 1) return currentStopIndex >= 0 ? 100 : 0;
     const clampedIndex = Math.min(Math.max(currentStopIndex, 0), totalStops - 1);
     return Math.min(100, Math.max(0, (clampedIndex / (totalStops - 1)) * 100));
@@ -86,7 +92,6 @@ export default function MapInfoBar({
 
   return (
     <div className="bg-navy-deep text-white p-3 space-y-3">
-      {/* Top row: Origin ····· Current ····· Destination — always one line */}
       <div className="flex items-start justify-between gap-1 overflow-x-auto">
         {stops.map((s, i) => (
           <div key={s.role} className="flex items-center min-w-0 flex-1">
@@ -113,8 +118,8 @@ export default function MapInfoBar({
         ))}
       </div>
 
-      {/* Progress bar row — icon + current-stop label both slide along
-          the bar at `pct`, instead of sitting fixed in the center */}
+      {/* Progress bar — icon + current-stop label slide along the bar at
+          the real percentage instead of sitting fixed in the center */}
       <div className="relative pt-1 pb-9">
         <div className="flex items-center justify-between text-[9px] sm:text-[10px] uppercase tracking-widest text-white/50 mb-1.5">
           <span className="truncate max-w-[38%]">{origin || "Origin"}</span>
