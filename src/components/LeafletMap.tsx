@@ -419,7 +419,7 @@ export default function LeafletMap({
       const ringClass = isOnHold ? "lm-pulse-ring hold" : "lm-pulse-ring";
       const iconSvg = vehicleSvg(mode, ringColor);
       const transform =
-        mode === "air" ? `rotate(${bearingDeg - 90}deg)` : `scaleX(${headingWest ? -1 : 1})`;
+        mode === "air" ? `rotate(${bearingDeg}deg)` : `scaleX(${headingWest ? -1 : 1})`
       const label =
         mode === "land"
           ? validCurrent?.label || currentLabel || "Current"
