@@ -147,12 +147,11 @@ export const HOLD_COLOR = "#f59e0b";
 function vehicleSvg(mode: TransportMode, color: string): string {
   const s = `width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"`;
 
-  if (mode === "air") {
-    return `<svg ${s}>
-      <g transform="rotate(90 12 12)">
-        <path fill="${color}" stroke="white" stroke-width="1"
-          d="M12 2.5c.4 0 .8.2 1 .5l1.2 2.3 6.3 1.7c.7.2 1 1 .5 1.5l-4.8 4.2 1.5 6.5c.2.7-.5 1.3-1.1.9L12 17.3l-4.6 2.8c-.6.4-1.3-.2-1.1-.9l1.5-6.5-4.8-4.2c-.5-.5-.2-1.3.5-1.5l6.3-1.7L11 3c.2-.3.6-.5 1-.5z"/>
-      </g>
+    if (mode === "air") {
+    // Bootstrap bi-airplane-engines-fill — solid, nose UP
+    return `<svg width="26" height="26" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <path fill="${color}" stroke="white" stroke-width="0.5"
+        d="M8 0c-.787 0-1.292.592-1.572 1.151A4.35 4.35 0 0 0 6 3v3.691l-2 1V7.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.191l-1.17.585A1.5 1.5 0 0 0 0 10.618V12a.5.5 0 0 0 .582.493l1.631-.272.313.937a.5.5 0 0 0 .948 0l.405-1.214 2.21-.369.375 2.253-1.318 1.318A.5.5 0 0 0 5.5 16h5a.5.5 0 0 0 .354-.854l-1.318-1.318.375-2.253 2.21.369.405 1.214a.5.5 0 0 0 .948 0l.313-.937 1.63.272A.5.5 0 0 0 16 12v-1.382a1.5 1.5 0 0 0-.83-1.342L14 8.691V7.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v.191l-2-1V3c0-.568-.14-1.271-.428-1.849C9.292.591 8.787 0 8 0"/>
     </svg>`;
   }
 
