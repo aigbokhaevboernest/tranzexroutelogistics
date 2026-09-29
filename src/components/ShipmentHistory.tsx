@@ -71,7 +71,8 @@ const sorted = [...history].sort((a, b) => parseDate(whenOf(b)) - parseDate(when
                 }}
               />
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-mono text-[11px] text-muted-foreground">{fmtDate(h.date)}</span>
+               <span className="text-mono text-[11px] text-muted-foreground">{fmtDate(whenOf(h))}</span>
+
                 {h.status && (
                   <span
                     className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full text-white"
