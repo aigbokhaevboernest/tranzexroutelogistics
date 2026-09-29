@@ -37,7 +37,9 @@ export default function ShipmentHistory({ history }: { history?: HistoryItem[] }
       hour: "2-digit", minute: "2-digit",
     });
   };
-  const sorted = [...history].sort((a, b) => parseDate(b.date) - parseDate(a.date));
+const whenOf = (h: HistoryItem) => h.at || h.date;
+const sorted = [...history].sort((a, b) => parseDate(whenOf(b)) - parseDate(whenOf(a)));
+
 
   const LIMIT = 3;
   const showAll = expanded || sorted.length <= LIMIT;
