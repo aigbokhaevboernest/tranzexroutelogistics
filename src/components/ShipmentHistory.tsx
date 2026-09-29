@@ -4,11 +4,13 @@ import { getStepColor } from "./Stepper";
 
 type HistoryItem = {
   date?: string;
+  at?: string;
   status?: string;
   location?: string;
   remarks?: string;
   comments?: string;
 };
+
 
 export default function ShipmentHistory({ history }: { history?: HistoryItem[] }) {
   const ref = useRef<HTMLDivElement>(null);
