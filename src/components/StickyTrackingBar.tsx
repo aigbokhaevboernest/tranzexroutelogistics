@@ -38,10 +38,10 @@ export default function StickyTrackingBar() {
 
   return (
     <div className="fixed bottom-0 inset-x-0 h-14 bg-navy-deep text-white z-40 flex items-center print:hidden">
-      <div className="max-w-7xl mx-auto px-4 w-full flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 w-full grid grid-cols-3 items-center gap-3">
 
         {/* Language selector — left */}
-        <div className="relative">
+        <div className="relative justify-self-start">
           <button
             onClick={() => setOpen((o) => !o)}
             className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded text-sm font-medium transition"
@@ -71,17 +71,21 @@ export default function StickyTrackingBar() {
           )}
         </div>
 
-        {/* Track label + button — right */}
-        <div className="flex items-center gap-3 ml-auto">
-          <span className="text-display font-bold tracking-wider text-sm md:text-base whitespace-nowrap">
-            Track a Shipment:
-          </span>
+        {/* Tracking button — center */}
+        <div className="justify-self-center">
           <Link
             to="/tracking"
             className="bg-brand-red text-white px-5 py-2 rounded text-sm font-bold tracking-wider hover:opacity-90 whitespace-nowrap"
           >
-            Tracking →
+            Tracking
           </Link>
+        </div>
+
+        {/* Track label — right end, arrow points left toward the button */}
+        <div className="justify-self-end">
+          <span className="text-display font-bold tracking-wider text-xs md:text-base whitespace-nowrap">
+            ← Track a Shipment
+          </span>
         </div>
 
       </div>
