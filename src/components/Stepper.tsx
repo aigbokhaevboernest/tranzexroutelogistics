@@ -46,8 +46,8 @@ export const AIR_STEPS: StepDef[] = [
   { key: "Origin Airport", label: "Origin Airport", icon: PlaneTakeoff, color: C_BLUE },
   { key: "Departed", label: "Departed", icon: Plane, color: C_RED },
   { key: "In Flight", label: "In Flight", icon: Plane, color: C_RED },
-  { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: C_AMBER },
   { key: "Arrived At Nearest Airport", label: "Arrived At Airport", icon: PlaneLanding, color: C_SKY },
+    { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: C_AMBER },
   { key: "Pick-up", label: "Pick-Up", icon: Hand, color: C_BLUE },
   { key: "Delivered", label: "Delivered", icon: CheckCircle2, color: C_GREEN },
 ];
@@ -56,8 +56,8 @@ export const SEA_STEPS: StepDef[] = [
   { key: "Origin Port", label: "Origin Port", icon: Anchor, color: C_BLUE },
   { key: "Departed Port", label: "Departed Port", icon: Ship, color: C_RED },
   { key: "At Sea", label: "At Sea", icon: Sailboat, color: C_TEAL },
-  { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: C_AMBER },
   { key: "Arrived At Destination Port", label: "Arrived At Port", icon: Anchor, color: C_SKY },
+    { key: "On Hold", label: "On Hold", icon: PauseOctagon, color: C_AMBER },
   { key: "pick-up", label: "Pick-Up", icon: Hand, color: C_BLUE },
   { key: "Delivered", label: "Delivered", icon: CheckCircle2, color: C_GREEN },
 ];
